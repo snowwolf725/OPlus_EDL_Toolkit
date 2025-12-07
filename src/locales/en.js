@@ -22,8 +22,9 @@ export default {
 		title: 'Reboot to',
 		system: 'Reboot to System',
 		recovery: 'Reboot to Recovery',
-		fastboot: 'Reboot to Fastboot',
+		fastboot: 'Reboot to FastbootD',
 		edl: 'Reboot to Edl',
+		miscNotFound: "The misc partition could not be found in the partition list.",
 	},
 	operation: {
 		title: 'Operation',

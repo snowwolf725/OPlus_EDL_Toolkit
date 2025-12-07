@@ -24,6 +24,7 @@
 		recovery: '重启到Recovery',
 		fastboot: '重启到fastboot',
 		edl: '重启到EDL模式',
+		miscNotFound: "在分区列表中无法找到misc分区",
 	},
 	operation: {
 		title: '功能操作',

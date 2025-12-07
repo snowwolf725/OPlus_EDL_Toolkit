@@ -115,11 +115,123 @@
     }
 
     async function rebootToRecovery() {
-        await invoke("reboot_to_recovery");
+        const builder = new XMLBuilder({
+            ignoreAttributes: false,
+            format: true,
+            suppressBooleanAttributes: false,
+            suppressEmptyNode: true,
+        });
+        let programs = [];
+        const data = {
+            program: programs
+        };
+        const jsObj = {
+            "?xml": {
+                "@_version": "1.0"
+            },
+            data: data
+        };
+        let isFound = false;
+        tableData.value.forEach((item, index) => {
+            if (item.partName == "misc") {
+                isFound = true;
+                const num = item.lun;
+                const partname = item.partName;
+                let part_size = item.partSize;
+                let part_start_sector = item.partStart;
+                const part_num = item.partNum;
+
+                if (part_size.length >= 2) {
+                    part_size = part_size.slice(0, -2);
+                }
+                let start_byte_hex = "";
+                if (isNaN(num) == false) {
+                    start_byte_hex = parseInt(part_start_sector) * 4096;
+                    start_byte_hex = '0x' + start_byte_hex.toString(16);
+                }
+
+                programs.push({
+                    "@_start_sector": part_start_sector,
+                    "@_size_in_KB": part_size,
+                    "@_physical_partition_number": num,
+                    "@_partofsingleimage": "false",
+                    "@_file_sector_offset": "0",
+                    "@_num_partition_sectors": part_num,
+                    "@_readbackverify": "false",
+                    "@_filename": "misc_torecovery.img",
+                    "@_sparse": item.sparse,
+                    "@_start_byte_hex": start_byte_hex,
+                    "@_SECTOR_SIZE_IN_BYTES": "4096",
+                    "@_label": partname
+                });
+            }
+        });
+        if (isFound) {
+            const xmlContent = builder.build(jsObj);
+            await invoke("reboot_to_recovery", { xml: xmlContent });
+        } else {
+            alert(t('reboot.miscNotFound'));
+        }
     }
 
     async function rebootToFastboot() {
-        await invoke("reboot_to_fastboot");
+        const builder = new XMLBuilder({
+            ignoreAttributes: false,
+            format: true,
+            suppressBooleanAttributes: false,
+            suppressEmptyNode: true,
+        });
+        let programs = [];
+        const data = {
+            program: programs
+        };
+        const jsObj = {
+            "?xml": {
+                "@_version": "1.0"
+            },
+            data: data
+        };
+        let isFound = false;
+        tableData.value.forEach((item, index) => {
+            if (item.partName == "misc") {
+                isFound = true;
+                const num = item.lun;
+                const partname = item.partName;
+                let part_size = item.partSize;
+                let part_start_sector = item.partStart;
+                const part_num = item.partNum;
+
+                if (part_size.length >= 2) {
+                    part_size = part_size.slice(0, -2);
+                }
+                let start_byte_hex = "";
+                if (isNaN(num) == false) {
+                    start_byte_hex = parseInt(part_start_sector) * 4096;
+                    start_byte_hex = '0x' + start_byte_hex.toString(16);
+                }
+
+                programs.push({
+                    "@_start_sector": part_start_sector,
+                    "@_size_in_KB": part_size,
+                    "@_physical_partition_number": num,
+                    "@_partofsingleimage": "false",
+                    "@_file_sector_offset": "0",
+                    "@_num_partition_sectors": part_num,
+                    "@_readbackverify": "false",
+                    "@_filename": "misc_tofastbootd.img",
+                    "@_sparse": item.sparse,
+                    "@_start_byte_hex": start_byte_hex,
+                    "@_SECTOR_SIZE_IN_BYTES": "4096",
+                    "@_label": partname
+                });
+            }
+        });
+        if (isFound) {
+            const xmlContent = builder.build(jsObj);
+            await invoke("reboot_to_fastboot", { xml: xmlContent });
+        } else {
+            alert(t('reboot.miscNotFound'));
+        }
     }
 
     async function rebootToEdl() {
@@ -258,6 +370,7 @@
             ignoreAttributes: false,
             format: true,
             suppressBooleanAttributes: false,
+            suppressEmptyNode: true,
         });
         let programs = [];
         const data = {
@@ -537,8 +650,8 @@ setInterval(updatePort, 1000);
                 <div class="btn-group">
                     <button class="btn-red" @click="rebootToSystem()">{{ t('reboot.system')}}</button>
                     <button class="btn-purple" @click="rebootToRecovery()">{{ t('reboot.recovery')}}</button>
-                    <button class="btn-purple"  @click="rebootToFastboot()">{{ t('reboot.fastboot')}}</button>
-                    <button class="btn-red"  @click="rebootToEdl()">{{ t('reboot.edl')}}</button>
+                    <button class="btn-purple" @click="rebootToFastboot()">{{ t('reboot.fastboot')}}</button>
+                    <button class="btn-red" @click="rebootToEdl()">{{ t('reboot.edl')}}</button>
                 </div>
             </div>
 

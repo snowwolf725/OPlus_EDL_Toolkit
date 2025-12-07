@@ -825,25 +825,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
-name = "edl_toolkit"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "byteorder",
- "encoding",
- "quick-xml 0.38.4",
- "serde",
- "serde_json",
- "serialport",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-opener",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "embed-resource"
 version = "3.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2533,6 +2514,25 @@ dependencies = [
  "is-wsl",
  "libc",
  "pathdiff",
+]
+
+[[package]]
+name = "oplus_edl_toolkit"
+version = "0.5.0"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "encoding",
+ "quick-xml 0.38.4",
+ "serde",
+ "serde_json",
+ "serialport",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-opener",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -335,12 +335,20 @@ fn reboot_to_system(app: AppHandle) {
 }
 
 #[tauri::command]
-fn reboot_to_recovery(app: AppHandle) {
+fn reboot_to_recovery(app: AppHandle, xml: &str) {
     let config = setup_env(&app);
     if config.is_connect == false {
         return ();
     }
-    let cmd = "<?xml version=\"1.0\" ?><data><power DelayInSeconds=\"0\" value=\"reset_to_recovery\" /></data>";
+    // flash misc partition
+    write_to_file("cmd1.xml", "res", &xml);
+    let _ = app.emit("log_event", &format!("Writ misc partition ..."));
+    let cmds = ["cmd", "/c", &config.fh_loader_path, &config.port_conn_str, 
+    "--memoryname=ufs", "--search_path=res", "--showpercentagecomplete", "--sendxml=res/cmd1.xml", 
+    "--noprompt", "--skip_configure", "--mainoutputdir=res"];
+    exec_cmd(&app, &cmds, PathBuf::from(".").as_path());
+    // send reboot command
+    let cmd = "<?xml version=\"1.0\" ?><data><power DelayInSeconds=\"0\" value=\"reset\" /></data>";
     write_to_file("cmd.xml", "res", &cmd);
     let _ = app.emit("log_event", &format!("Reboot to recovery..."));
     let cmds = ["cmd", "/c", &config.fh_loader_path, &config.port_conn_str, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
@@ -348,14 +356,22 @@ fn reboot_to_recovery(app: AppHandle) {
 }
 
 #[tauri::command]
-fn reboot_to_fastboot(app: AppHandle) {
+fn reboot_to_fastboot(app: AppHandle, xml: &str) {
     let config = setup_env(&app);
     if config.is_connect == false {
         return ();
     }
-    let cmd = "<?xml version=\"1.0\" ?><data><power DelayInSeconds=\"0\" value=\"reset_to_bootloader\" /></data>";
+    // flash misc partition
+    write_to_file("cmd.xml", "res", &xml);
+    let _ = app.emit("log_event", &format!("Writ misc partition ..."));
+    let cmds = ["cmd", "/c", &config.fh_loader_path, &config.port_conn_str, 
+    "--memoryname=ufs", "--search_path=res", "--showpercentagecomplete", "--sendxml=res/cmd.xml", 
+    "--noprompt", "--skip_configure", "--mainoutputdir=res"];
+    exec_cmd(&app, &cmds, PathBuf::from(".").as_path());
+    // send reboot command
+    let cmd = "<?xml version=\"1.0\" ?><data><power DelayInSeconds=\"0\" value=\"reset\" /></data>";
     write_to_file("cmd.xml", "res", &cmd);
-    let _ = app.emit("log_event", &format!("Reboot to fastboot..."));
+    let _ = app.emit("log_event", &format!("Reboot to fastbootD..."));
     let cmds = ["cmd", "/c", &config.fh_loader_path, &config.port_conn_str, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
     exec_cmd(&app, &cmds, PathBuf::from(".").as_path());
 }
@@ -459,12 +475,13 @@ fn read_part(app: AppHandle, xml: &str)  -> String {
                    println!("success:{}", file_name);
                }
 
-               let config = setup_env(&app);
+               let config = setup_env(&app);/*
                if config.is_connect == false {
                     return format!("port not available");
-               }
+               }*/
                let _ = app.emit("log_event", &format!("Read partition {}...", read.label));
-               let cmds = ["cmd", "/c", &config.fh_loader_path, &config.port_conn_str, "--memoryname=ufs", "--convertprogram2read", "--showpercentagecomplete", "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=img"];
+               let cmds = ["cmd", "/c", &config.fh_loader_path, &config.port_conn_str, "--memoryname=ufs", 
+               "--convertprogram2read", "--showpercentagecomplete", "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=img"];
                exec_cmd(&app, &cmds, PathBuf::from(".").as_path());
             }
             format!("")
@@ -561,7 +578,7 @@ fn write_from_xml(app: AppHandle, file_path:&str) -> String {
                let cmds = ["cmd", "/c", &config.fh_loader_path, &config.port_conn_str, 
                "--memoryname=ufs", &dir_str, "--showpercentagecomplete", "--sendxml=res/cmd.xml", 
                "--noprompt", "--skip_configure", "--mainoutputdir=res"];
-               exec_cmd(&app, &cmds, config.current_dir.as_path());
+               exec_cmd(&app, &cmds, PathBuf::from(".").as_path());
             }
             format!("")
         }
