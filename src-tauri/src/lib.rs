@@ -719,6 +719,25 @@ fn read_device_info(app: AppHandle) -> String {
     return "".to_string();
 }
 
+#[tauri::command]
+fn switch_slot(app: AppHandle, slot: &str) -> String {
+    let config = setup_env(&app);
+    if config.is_connect == false {
+        return "Device not found".to_string();
+    }
+    let cmd = if slot == "A" {
+        "<?xml version=\"1.0\" ?><data><setbootablestoragedrive value=\"1\" /></data>".to_string()
+    } else {
+        "<?xml version=\"1.0\" ?><data><setbootablestoragedrive value=\"2\" /></data>".to_string()
+    };
+    write_to_file("cmd.xml", "res", &cmd);
+    let _ = app.emit("log_event", &format!("Reboot to EDL..."));
+    let cmds = ["cmd", "/c", &config.fh_loader_path, &config.port_conn_str, "--memoryname=ufs", 
+               "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
+    let result = exec_cmd(&app, &cmds, PathBuf::from(".").as_path());
+    return result;
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -726,7 +745,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![update_port, send_loader, read_part, write_part, read_gpt,
-        reboot_to_system, reboot_to_recovery, reboot_to_fastboot, reboot_to_edl, save_to_xml, write_from_xml, read_device_info])
+        reboot_to_system, reboot_to_recovery, reboot_to_fastboot, reboot_to_edl, save_to_xml, write_from_xml, read_device_info, switch_slot])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

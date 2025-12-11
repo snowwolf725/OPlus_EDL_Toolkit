@@ -35,6 +35,7 @@
 		writeFromXML: 'XML写入固件',
 		createXML: '保存至XML',
 		readDeviceInfo: '读设备信息',
+		switchSlot: '切换槽位',
 		useBuildIn: '使用內建fh_loader',
 		saveAlert: '请至少选取一个分区',
 	},

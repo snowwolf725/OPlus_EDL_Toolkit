@@ -1,11 +1,14 @@
 <script setup>
-    import { ref } from "vue";
+    import { ref, watch } from "vue";
     import { useI18n } from 'vue-i18n';
     import { invoke } from "@tauri-apps/api/core";
     import { listen } from "@tauri-apps/api/event";
     import { open, save } from "@tauri-apps/plugin-dialog";
     import { readTextFile, writeTextFile, BaseDirectory } from '@tauri-apps/plugin-fs';
     import { XMLParser, XMLBuilder } from 'fast-xml-parser';
+
+    const slotDialogRef = ref(null);
+    const isDialogOpen = ref(false);
 
     const { t, locale, availableLocales } = useI18n();
 
@@ -21,6 +24,13 @@
     ]);
 
     const tableData = ref([]);
+
+    watch(isDialogOpen, (newVal) => {
+        const dialog = slotDialogRef.value;
+        if (!dialog) return;
+
+        newVal ? dialog.showModal() : dialog.close();
+    });
 
     listen("log_event", (payload) => {
         console.log(payload);
@@ -440,6 +450,11 @@
         alert(result);
     }
 
+    async function switchSlot(slot) {
+        isDialogOpen.value = false;
+        await invoke("switch_slot", {slot: slot});
+    }
+
     window.onload = function () {
         document.getElementById('btn_selectLoaderFile').addEventListener('click', async () => {
             try {
@@ -561,6 +576,20 @@ setInterval(updatePort, 1000);
 </script>
 
 <template>
+    <dialog ref="slotDialogRef"
+            class="slot-dialog">
+        <h3 class="dialog-title">选择启动槽位</h3>
+        <div class="dialog-btn-group">
+            <button class="slot-btn slot-btn-a"
+                    @click="switchSlot('A')">
+                A
+            </button>
+            <button class="slot-btn slot-btn-b"
+                    @click="switchSlot('B')">
+                B
+            </button>
+        </div>
+    </dialog>
     <div class="container">
         <!-- Header -->
         <div class="header">
@@ -577,124 +606,125 @@ setInterval(updatePort, 1000);
 
         <!-- Main Content -->
         <div class="main-content">
-          <div class="left-container">
-            <!-- Loader files -->
-            <div class="left-top-wrapper" >
-                <div class="section-title">
-                    <span>{{ t('config.title')}}</span>
+            <div class="left-container">
+                <!-- Loader files -->
+                <div class="left-top-wrapper">
+                    <div class="section-title">
+                        <span>{{ t('config.title')}}</span>
+                    </div>
+                    <div class="form-group">
+                        <label>{{ t('config.loader')}}</label>
+                        <input type="text" class="file-input" id="loaderPathDisplay" value="res/devprg">
+                        <button class="select-btn" id="btn_selectLoaderFile">{{ t('config.selectBtn')}}</button>
+                    </div>
+                    <div class="form-group">
+                        <label>{{ t('config.digest')}}</label>
+                        <input type="text" class="file-input" id="digestPathDisplay" value="res/digest">
+                        <button class="select-btn" id="btn_selectDigestFile">{{ t('config.selectBtn')}}</button>
+                    </div>
+                    <div class="form-group">
+                        <label>{{ t('config.sign')}}</label>
+                        <input type="text" class="file-input" id="signPathDisplay" value="res/sig">
+                        <button class="select-btn" id="btn_selectSignFile">{{ t('config.selectBtn')}}</button>
+                    </div>
+                    <div class="form-group">
+                        <label>Raw XML:</label>
+                        <input type="text" class="file-input" id="rawXmlPathDisplay" value="res/rawprogam0.xml">
+                        <button class="select-btn" id="btn_selectRawXmlFile">{{ t('config.selectBtn')}}</button>
+                    </div>
+                    <div class="form-group">
+                        <label>Patch XML:</label>
+                        <input type="text" class="file-input" id="patchXmlPathDisplay" value="res/patch.xml">
+                        <button class="select-btn" id="btn_selectPatchXmlFile">{{ t('config.selectBtn')}}</button>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>{{ t('config.loader')}}</label>
-                    <input type="text" class="file-input" id="loaderPathDisplay" value="res/devprg">
-                    <button class="select-btn" id="btn_selectLoaderFile">{{ t('config.selectBtn')}}</button>
+
+                <!-- Device Partition Table -->
+                <div class="left-bottom-table-wrapper">
+                    <div class="section-title">
+                        <span>{{ t('part.title') }}</span>
+                    </div>
+                    <div class="table-header">
+                        <input type="text" id="partFilter" :placeholder="$t('part.filter')">
+                        <button id="selectAll" @click="selectAll">{{ t('part.selectAll') }}</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th v-for="col in tableColumns" :key="col.key" :style="{ width: col.width }">
+                                        {{ col.label }}
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="part-table" id="partTable">
+                                <tr v-for="(item, index) in tableData" :key="index">
+                                    <td><input v-model="item.chk" type='checkbox'></td>
+                                    <td>{{ item.lun }}</td>
+                                    <td class="partName">{{ item.partName }}</td>
+                                    <td>{{ item.partSize }}</td>
+                                    <td>{{ item.partStart }}</td>
+                                    <td>{{ item.partNum }}</td>
+                                    <td>{{ item.imgPath }}</td>
+                                    <td><button id='{{ item.sel }}' @click="selectImgPath(item)">{{ t('config.selectBtn') }}</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>{{ t('config.digest')}}</label>
-                    <input type="text" class="file-input" id="digestPathDisplay" value="res/digest">
-                    <button class="select-btn" id="btn_selectDigestFile">{{ t('config.selectBtn')}}</button>
+
+
+            </div>
+            <div class="right-container">
+                <!-- Reboot -->
+                <div class="right-top-table-wrapper">
+                    <div class="section-title">
+                        <span>{{ t('reboot.title')}}</span>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn-red" @click="rebootToSystem()">{{ t('reboot.system')}}</button>
+                        <button class="btn-purple" @click="rebootToRecovery()">{{ t('reboot.recovery')}}</button>
+                        <button class="btn-purple" @click="rebootToFastboot()">{{ t('reboot.fastboot')}}</button>
+                        <button class="btn-red" @click="rebootToEdl()">{{ t('reboot.edl')}}</button>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>{{ t('config.sign')}}</label>
-                    <input type="text" class="file-input" id="signPathDisplay" value="res/sig">
-                    <button class="select-btn" id="btn_selectSignFile">{{ t('config.selectBtn')}}</button>
+
+                <!-- Operation -->
+                <div class="right-bottom-table-wrapper">
+                    <form class="row" @submit.prevent="greet">
+                        <div class="section-title">
+                            <span>{{ t('operation.title') }}</span>
+                        </div>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox">{{ t('operation.useBuildIn') }}</label>
+                        </div>
+                        <div class="radio-group">
+                            <label><input type="radio" name="storage" checked> UFS</label>
+                            <label><input type="radio" name="storage"> EMMC</label>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn-blue" @click="sendLoader">{{ t('operation.sendLoader') }}</button>
+                            <button class="btn-green" @click="readGPT">{{ t('operation.readGPT') }}</button>
+                            <button class="btn-blue" @click="readPart">{{ t('operation.readPart') }}</button>
+                            <button class="btn-orange" @click="writePart">{{ t('operation.writePart') }}</button>
+                            <button class="btn-orange" @click="writeFromXML">{{ t('operation.writeFromXML') }}</button>
+                            <button class="btn-brown" @click="saveToXML">{{ t('operation.createXML') }}</button>
+                            <button class="btn-brown" @click="readDeviceInfo">{{ t('operation.readDeviceInfo') }}</button>
+                            <button class="btn-red" @click="isDialogOpen = true">{{ t('operation.switchSlot') }}</button>
+                        </div>
+                    </form>
                 </div>
-                <div class="form-group">
-                    <label>Raw XML:</label>
-                    <input type="text" class="file-input" id="rawXmlPathDisplay" value="res/rawprogam0.xml">
-                    <button class="select-btn" id="btn_selectRawXmlFile">{{ t('config.selectBtn')}}</button>
-                </div>
-                <div class="form-group">
-                    <label>Patch XML:</label>
-                    <input type="text" class="file-input" id="patchXmlPathDisplay" value="res/patch.xml">
-                    <button class="select-btn" id="btn_selectPatchXmlFile">{{ t('config.selectBtn')}}</button>
+
+                <!-- Log -->
+                <div class="right-bottom-table-wrapper2">
+                    <div class="section-title">
+                        <span>{{ t('log.title') }}</span>
+                    </div>
+                    <div class="log-section" id="logContainer">
+                    </div>
                 </div>
             </div>
 
-            <!-- Device Partition Table -->
-            <div class="left-bottom-table-wrapper">
-                <div class="section-title">
-                    <span>{{ t('part.title') }}</span>
-                </div>
-                <div class="table-header">
-                    <input type="text" id="partFilter" :placeholder="$t('part.filter')">
-                    <button id="selectAll" @click="selectAll">{{ t('part.selectAll') }}</button>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th v-for="col in tableColumns" :key="col.key" :style="{ width: col.width }">
-                                    {{ col.label }}
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="part-table" id="partTable">
-                            <tr v-for="(item, index) in tableData" :key="index">
-                                <td><input v-model="item.chk" type='checkbox'></td>
-                                <td>{{ item.lun }}</td>
-                                <td class="partName">{{ item.partName }}</td>
-                                <td>{{ item.partSize }}</td>
-                                <td>{{ item.partStart }}</td>
-                                <td>{{ item.partNum }}</td>
-                                <td>{{ item.imgPath }}</td>
-                                <td><button id='{{ item.sel }}' @click="selectImgPath(item)">{{ t('config.selectBtn') }}</button></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-
-          </div>
-          <div class="right-container">
-            <!-- Reboot -->
-            <div class="right-top-table-wrapper">
-                <div class="section-title">
-                    <span>{{ t('reboot.title')}}</span>
-                </div>
-                <div class="btn-group">
-                    <button class="btn-red" @click="rebootToSystem()">{{ t('reboot.system')}}</button>
-                    <button class="btn-purple" @click="rebootToRecovery()">{{ t('reboot.recovery')}}</button>
-                    <button class="btn-purple" @click="rebootToFastboot()">{{ t('reboot.fastboot')}}</button>
-                    <button class="btn-red" @click="rebootToEdl()">{{ t('reboot.edl')}}</button>
-                </div>
-            </div>
-
-            <!-- Operation -->
-            <div class="right-bottom-table-wrapper">
-              <form class="row" @submit.prevent="greet">
-                <div class="section-title">
-                    <span>{{ t('operation.title') }}</span>
-                </div>
-                <div class="checkbox-group">
-                    <label><input type="checkbox">{{ t('operation.useBuildIn') }}</label>
-                </div>
-                <div class="radio-group">
-                    <label><input type="radio" name="storage" checked> UFS</label>
-                    <label><input type="radio" name="storage"> EMMC</label>
-                </div>
-                <div class="btn-group">
-                    <button class="btn-blue" @click="sendLoader">{{ t('operation.sendLoader') }}</button>
-                    <button class="btn-green" @click="readGPT">{{ t('operation.readGPT') }}</button>
-                    <button class="btn-blue" @click="readPart">{{ t('operation.readPart') }}</button>
-                    <button class="btn-orange" @click="writePart">{{ t('operation.writePart') }}</button>
-                    <button class="btn-orange" @click="writeFromXML">{{ t('operation.writeFromXML') }}</button>
-                    <button class="btn-brown" @click="saveToXML">{{ t('operation.createXML') }}</button>
-                    <button class="btn-brown" @click="readDeviceInfo">{{ t('operation.readDeviceInfo') }}</button>
-                </div>
-              </form>
-            </div>
-            
-            <!-- Log -->
-            <div class="right-bottom-table-wrapper2">
-                <div class="section-title">
-                    <span>{{ t('log.title') }}</span>
-                </div>
-                <div class="log-section" id="logContainer">
-                </div>
-            </div>
-          </div>
-            
         </div>
     </div>
 </template>
@@ -720,7 +750,7 @@ setInterval(updatePort, 1000);
             padding: 20px;
         }
         .container {
-            max-width: 100vw	;
+            max-width: 100vw;
             margin: 0 auto;
             background: linear-gradient(135deg, #5b86e5, #36d1dc);
             border-radius: 8px;
@@ -929,5 +959,53 @@ setInterval(updatePort, 1000);
             overflow-y: auto;
             font-size: 12px;
             line-height: 1.5;
+        }
+        .open-dialog-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background-color: #2563eb;
+            color: white;
+            cursor: pointer;
+        }
+        .open-dialog-btn:hover {
+            background-color: #1d4ed8;
+        }
+        .slot-dialog {
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 0px;
+            width: 200px;
+            text-align: center;
+            margin: auto;
+        }
+        .dialog-title {
+            margin: 0 0 20px 0;
+            font-size: 16px;
+            color: #1e293b;
+        }
+        .dialog-btn-group {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+        }
+        .slot-btn {
+            padding: 8px 24px;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+        }
+        .slot-btn-a {
+            background-color: #059669;
+        }
+        .slot-btn-a:hover {
+            background-color: #047857;
+        }
+        .slot-btn-b {
+            background-color: #d946ef;
+        }
+        .slot-btn-b:hover {
+            background-color: #c026d3;
         }
 </style>

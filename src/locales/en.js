@@ -35,6 +35,7 @@ export default {
 		writeFromXML: 'Write from XML',
 		createXML: 'Save to XML',
 		readDeviceInfo: 'Read device Info',
+		switchSlot: 'Switch Slot',
 		useBuildIn: 'Use the build-in fh_loader',
 		saveAlert: 'Please select at least one partition.',
 	},
