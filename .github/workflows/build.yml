@@ -94,7 +94,12 @@ jobs:
       - name: compress oplus_edl_toolkit  (windows only)
         if: matrix.platform == 'windows-latest'
         run: |
-          Compress-Archive -Path D:\a\OPlus_EDL_Toolkit\OPlus_EDL_Toolkit\src-tauri\target\release\oplus_edl_toolkit.exe -Destination oplus_edl_toolkit.zip
+          md D:\a\release
+          copy D:\a\OPlus_EDL_Toolkit\OPlus_EDL_Toolkit\src-tauri\target\release\oplus_edl_toolkit.exe D:\a\release\
+          xcopy D:\a\OPlus_EDL_Toolkit\OPlus_EDL_Toolkit\src-tauri\res D:\a\release\res /E /I
+          xcopy D:\a\OPlus_EDL_Toolkit\OPlus_EDL_Toolkit\src-tauri\img D:\a\release\img /E /I
+          xcopy D:\a\OPlus_EDL_Toolkit\OPlus_EDL_Toolkit\src-tauri\tools D:\a\release\tools /E /I
+          Compress-Archive -Path D:\a\release -Destination oplus_edl_toolkit.zip
 
       - name: Upload an Asset in GitHub Release (windows only)
         if: matrix.platform == 'windows-latest'
