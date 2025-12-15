@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.create-release.outputs.result }}
+      portable_file_name: ${{ steps.create-release.outputs.get-file-name }}
 
     steps:
       - uses: actions/checkout@v4
@@ -25,9 +26,10 @@ jobs:
           node-version: lts/*
 
       - name: get version an file name
+        id: get-file-name
         run: |
           echo "PACKAGE_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
-          echo "PORTABLE_FILE_NAME=oplus_edl_toolkit-$PACKAGE_VERSION.x86_64_portable.zip" >> $GITHUB_ENV
+          return "oplus_edl_toolkit-$PACKAGE_VERSION.x86_64_portable.zip"
 
       - name: create release
         id: create-release
@@ -108,7 +110,7 @@ jobs:
         uses: "actions/github-script@v6"
         env:
           release_id: ${{ needs.create-release.outputs.release_id }}
-          file_name: ${{ env.PORTABLE_FILE_NAME }}
+          file_name: ${{ needs.create-release.outputs.portable_file_name }}
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
           script: |
