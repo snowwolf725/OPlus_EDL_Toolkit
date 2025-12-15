@@ -91,6 +91,11 @@ jobs:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
 
+      - name: compress (windows only)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          Compress-Archive -Path D:\a\OPlus_EDL_Toolkit\OPlus_EDL_Toolkit\src-tauri\target\release\oplus_edl_toolkit.exe -Destination oplus_edl_toolkit.zip
+          
   publish-release:
     permissions:
       contents: write
