@@ -72,7 +72,7 @@ jobs:
 
       - name: get file name
         run: |
-          echo "PORTABLE_FILE_NAME=oplus_edl_toolkit-$(node -p "require('D:\a\OPlus_EDL_Toolkit\OPlus_EDL_Toolkit\package.json').version").x86_64_portable.zip" >> $GITHUB_ENV        
+          echo "PORTABLE_FILE_NAME=oplus_edl_toolkit-$(node -p "require('./package.json').version").x86_64_portable.zip" >> $GITHUB_ENV        
           echo ${{ env.PORTABLE_FILE_NAME}}
           
       - name: install Rust stable
