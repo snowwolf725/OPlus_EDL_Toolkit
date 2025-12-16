@@ -971,7 +971,7 @@ setInterval(updatePort, 1000);
         background-color: rgba(0,0,0,0.5);
         border-radius: 4px;
         padding: 10px;
-        height: 250px;
+        height: 85%;
         overflow-y: auto;
         font-size: 12px;
         line-height: 1.5;
