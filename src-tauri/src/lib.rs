@@ -121,6 +121,16 @@ fn exec_cmd(app: &AppHandle, cmd: &[&str], current_dir:&Path) -> String {
     return result;
 }
 
+fn print_result(app: &AppHandle, item: CommandItem) {
+    println!("[Main/Print] Command: {}, Result: {}", item.cmd, item.exec_result);
+    let _ = app.emit("log_event", &format!("Command: {} {:?}", item.cmd, item.args));
+    if item.is_success {
+        let _ = app.emit("log_event", &format!("{}...OK", item.msg));
+    } else {
+        let _ = app.emit("log_event", &format!("{}...Error", item.msg));
+    }
+}
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn update_port() -> (String, String) {
@@ -154,14 +164,18 @@ fn reboot_to_system(app: AppHandle) {
     }
     let cmd = "<?xml version=\"1.0\" ?><data><power DelayInSeconds=\"0\" value=\"reset\" /></data>";
     file_util::write_to_file("cmd.xml", "res", &cmd);
-    let _ = app.emit("log_event", &format!("Reboot to system..."));
+    //let _ = app.emit("log_event", &format!("Reboot to system..."));
     #[cfg(target_os = "windows")] {
-        let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
-        exec_cmd(&app, &cmds, PathBuf::from(".").as_path());
+        command_worker::add_command("Reboot to system", "cmd", 
+        vec!["/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"]);
+        //let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
+        //exec_cmd(&app, &cmds, PathBuf::from(".").as_path());
     }
     #[cfg(target_os = "linux")] {
-        let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"];
-        exec_cmd(&app, &cmds, PathBuf::from(".").as_path());
+        command_worker::add_command("Reboot to system", &config.fh_loader_path_linux, 
+        vec![&config.fh_port_conn_str_linux, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"]);
+        //let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"];
+        //exec_cmd(&app, &cmds, PathBuf::from(".").as_path());
     }
 }
 
@@ -566,8 +580,20 @@ fn switch_slot(app: AppHandle, slot: &str) -> String {
 }
 
 #[tauri::command]
+fn init(app: AppHandle) {
+    let receiver = command_worker::init_worker();
+    let value = app.clone();
+    std::thread::spawn(move || {
+        while let Ok(result_item) = receiver.recv() {
+            print_result(&value, result_item);
+        }
+    });
+}
+
+#[tauri::command]
 fn start_flashing(app: AppHandle, path: &str) -> String {
     let mut result = String::new();
+
     if file_util::check_necessary_files_in_edl_folder(&path) {
         let _ = app.emit("log_event", &format!("Check necessary files...OK"));
         result = format!("Check necessary files...OK");
@@ -584,7 +610,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![update_port, send_loader, read_part, write_part, read_gpt,
+        .invoke_handler(tauri::generate_handler![init, update_port, send_loader, read_part, write_part, read_gpt,
         reboot_to_system, reboot_to_recovery, reboot_to_fastboot, reboot_to_edl, save_to_xml, write_from_xml, 
         read_device_info, switch_slot, start_flashing])
         .run(tauri::generate_context!())

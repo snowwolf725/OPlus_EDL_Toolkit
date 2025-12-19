@@ -1,11 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "oplus_edl_toolkit",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "identifier": "me.snowwolf725",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:5420",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
@@ -44,6 +44,13 @@
       "res/misc_tofastbootd.img",
       "res/misc_torecovery.img",
       "img/placeholder"
-    ]
+    ],
+    "linux": {
+      "appimage": {
+        "files": {
+          "/usr/lib/x86_64-linux-gnu/gio/modules/libgvfsdbus.so": "/usr/lib/x86_64-linux-gnu/gio/modules/libgvfsdbus.so"
+        }
+      }
+    }
   }
 }

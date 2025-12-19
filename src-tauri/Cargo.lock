@@ -2622,7 +2622,7 @@ dependencies = [
 
 [[package]]
 name = "oplus_edl_toolkit"
-version = "0.7.5"
+version = "0.7.6"
 dependencies = [
  "anstream",
  "anyhow",

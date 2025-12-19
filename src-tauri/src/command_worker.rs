@@ -1,6 +1,8 @@
-﻿use std::sync::{Arc, Condvar, Mutex, mpsc};
+﻿use lazy_static::lazy_static;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::{Arc, Condvar, Mutex, mpsc};
 use std::thread;
-use lazy_static::lazy_static;
 
 // Export
 pub use self::inner::{CommandItem, CommandQueue, QueueManager};
@@ -11,9 +13,11 @@ mod inner {
 
     #[derive(Debug, Clone)]
     pub struct CommandItem {
+        pub msg: String,
         pub cmd: String,
         pub args: Vec<String>,
         pub is_finish: bool,
+        pub is_success: bool,
         pub exec_result: String,
     }
 
@@ -40,8 +44,36 @@ mod inner {
             if index < self.commands.len() {
                 let mut cmd = &mut self.commands[index];
                 if !cmd.is_finish {
-                    // Simulate command execution logic
-                    cmd.exec_result = format!("Executed: {} {:?}", cmd.cmd, cmd.args);
+                    // command execution logic
+                    let mut exe_cmd = Command::new(cmd.cmd.clone());
+                    #[cfg(target_os = "windows")]
+                    {
+                      use std::os::windows::process::CommandExt;
+                      exe_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW constant
+                    }
+                    for (_index, s) in cmd.args.iter().enumerate() {
+                            exe_cmd.arg(s);
+                    }
+                    let output = exe_cmd.current_dir(PathBuf::from(".").as_path()).output();
+                    let result = match output {
+                        Ok(output) => {
+                            if output.status.success() {
+                                cmd.is_success = true;
+                                String::from_utf8_lossy(&output.stdout).to_string()
+                            } else {
+                                cmd.is_success = false;
+                                let err_msg = String::from_utf8_lossy(&output.stderr).to_string();
+                                format!("[Error]: {}", err_msg)
+                            }
+                        }
+                        Err(e) => {
+                            cmd.is_success = false;
+                            let err_msg = format!("Execution failed: {}", e);
+                            format!("[Error]: {}", err_msg)
+                        }
+                    };
+
+                    cmd.exec_result = format!("Executed: {} {:?} Result: {}", cmd.cmd, cmd.args, result);
                     cmd.is_finish = true;
                     // handle error message
                     if let Err(e) = sender.send(cmd.clone()) {
@@ -168,4 +200,22 @@ pub fn shutdown_worker() {
 pub fn get_global_manager() -> Arc<inner::QueueManager> {
     let manager_guard = GLOBAL_QUEUE_MANAGER.lock().unwrap();
     manager_guard.as_ref().expect("QueueManager not initialized! Call init_worker() first.").clone()
+}
+
+pub fn add_command(msg: &str, cmd: &str, args: Vec<&str>) {
+    let string_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+    
+    let manager = get_global_manager();
+    let item = CommandItem {
+        msg: msg.to_string(),
+        cmd: cmd.to_string(),
+        args: string_vec,
+        is_finish: false,
+        is_success: false,
+        exec_result: String::new(),
+    };
+    let mut queue = manager.queue.lock().unwrap();
+    queue.add_command(item);
+    drop(queue);
+    manager.condvar.notify_one();
 }
