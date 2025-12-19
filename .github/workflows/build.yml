@@ -111,6 +111,8 @@ jobs:
           cp -a /home/runner/work/OPlus_EDL_Toolkit/OPlus_EDL_Toolkit/src-tauri/res release/OPlus_EDL_Toolkit/
           cp -a /home/runner/work/OPlus_EDL_Toolkit/OPlus_EDL_Toolkit/src-tauri/img release/OPlus_EDL_Toolkit/
           cp -a /home/runner/work/OPlus_EDL_Toolkit/OPlus_EDL_Toolkit/src-tauri/tools release/OPlus_EDL_Toolkit/
+          chmod a+x release/OPlus_EDL_Toolkit/tools/*
+          chmod a+x release/*.AppImage
           cd release
           zip -r oplus_edl_toolkit.zip OPlus_EDL_Toolkit/
           mv oplus_edl_toolkit.zip ..
