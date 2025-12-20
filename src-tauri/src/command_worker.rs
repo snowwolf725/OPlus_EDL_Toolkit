@@ -219,3 +219,20 @@ pub fn add_command(msg: &str, cmd: &str, args: Vec<&str>) {
     drop(queue);
     manager.condvar.notify_one();
 }
+
+pub fn add_command_without_notify(msg: &str, cmd: &str, args: Vec<&str>) {
+    let string_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+    
+    let manager = get_global_manager();
+    let item = CommandItem {
+        msg: msg.to_string(),
+        cmd: cmd.to_string(),
+        args: string_vec,
+        is_finish: false,
+        is_success: false,
+        exec_result: String::new(),
+    };
+    let mut queue = manager.queue.lock().unwrap();
+    queue.add_command(item);
+    drop(queue);
+}

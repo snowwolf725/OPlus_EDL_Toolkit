@@ -357,22 +357,22 @@ fn send_loader(app: AppHandle, loader: &str, digest: &str, sig: &str, native: bo
         let digest_str = r"--signeddigests=".to_owned() + digest;
         let sig_str = r"--signeddigests=".to_owned() + sig;
         #[cfg(target_os = "windows")] {
-            command_worker::add_command("Send Loader", "cmd", 
+            command_worker::add_command_without_notify("Send Loader", "cmd", 
             vec!["/c", &config.sahara_server_path, "-p", &config.sahara_port_conn_str, "-s", &loader_str]);
             
-            command_worker::add_command("Send Digest", "cmd", 
+            command_worker::add_command_without_notify("Send Digest", "cmd", 
             vec!["/c", &config.fh_loader_path, &config.fh_port_conn_str, &digest_str, "--testvipimpact", "--noprompt", "--skip_configure", "--mainoutputdir=res"]);
 
-            command_worker::add_command("Send Transfer Config", "cmd", 
+            command_worker::add_command_without_notify("Send Transfer Config", "cmd", 
             vec!["/c", &config.fh_loader_path, &config.fh_port_conn_str, "--sendxml=res/transfercfg.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"]);
 
-            command_worker::add_command("Send Verify", "cmd", 
+            command_worker::add_command_without_notify("Send Verify", "cmd", 
             vec!["/c", &config.fh_loader_path, &config.fh_port_conn_str, "--sendxml=res/verify.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"]);
 
-            command_worker::add_command("Send Sig", "cmd", 
+            command_worker::add_command_without_notify("Send Sig", "cmd", 
             vec!["/c", &config.fh_loader_path, &config.fh_port_conn_str, &sig_str, "--testvipimpact", "--noprompt", "--skip_configure", "--mainoutputdir=res"]);
 
-            command_worker::add_command("Send SHA256 init", "cmd", 
+            command_worker::add_command_without_notify("Send SHA256 init", "cmd", 
             vec!["/c", &config.fh_loader_path, &config.fh_port_conn_str, "--sendxml=res/sha256init.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"]);
 
             command_worker::add_command("Send Storage Config", "cmd", 
@@ -380,19 +380,19 @@ fn send_loader(app: AppHandle, loader: &str, digest: &str, sig: &str, native: bo
         }
         #[cfg(target_os = "linux")] {
             let (port_path, _port_info) = update_port();
-            command_worker::add_command("Send Loader", &config.sahara_server_path_linux, 
+            command_worker::add_command_without_notify("Send Loader", &config.sahara_server_path_linux, 
             vec!["-p", &port_path, "-s", &loader_str]);
             
-            command_worker::add_command("Send Digest", &config.fh_loader_path_linux, 
+            command_worker::add_command_without_notify("Send Digest", &config.fh_loader_path_linux, 
             vec![&config.fh_port_conn_str_linux, &digest_str, "--testvipimpact", "--noprompt", "--mainoutputdir=res"]);
 
-            command_worker::add_command("Send Transfer Config", &config.fh_loader_path_linux, 
+            command_worker::add_command_without_notify("Send Transfer Config", &config.fh_loader_path_linux, 
             vec![&config.fh_port_conn_str_linux, "--sendxml=res/transfercfg.xml", "--noprompt", "--mainoutputdir=res"]);
 
-            command_worker::add_command("Send Verify", &config.fh_loader_path_linux, 
+            command_worker::add_command_without_notify("Send Verify", &config.fh_loader_path_linux, 
             vec![&config.fh_port_conn_str_linux, "--sendxml=res/verify.xml", "--noprompt", "--mainoutputdir=res"]);
 
-            command_worker::add_command("Send Sig", &config.fh_loader_path_linux, 
+            command_worker::add_command_without_notify("Send Sig", &config.fh_loader_path_linux, 
             vec![&config.fh_port_conn_str_linux, &sig_str, "--testvipimpact", "--noprompt", "--mainoutputdir=res"]);
 
             command_worker::add_command("Send SHA256 init", &config.fh_loader_path_linux, 
