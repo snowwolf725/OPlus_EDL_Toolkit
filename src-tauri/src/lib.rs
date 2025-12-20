@@ -290,6 +290,7 @@ fn write_part(app: AppHandle, xml: &str)  -> String {
         }
         
         let dir_str = format!("--search_path={}", &dir_path);
+        let _ = app.emit("log_event", format!("Start writing partition {}", part));
         #[cfg(target_os = "windows")] {
             command_worker::add_command(&format!("Writ partition {}...", part), "cmd", 
             vec!["/c", &config.fh_loader_path, &config.fh_port_conn_str, 
@@ -323,6 +324,7 @@ fn read_part(app: AppHandle, xml: &str)  -> String {
         if config.is_connect == false {
             return format!("port not available");
         }
+        let _ = app.emit("log_event", format!("Start reading partition {}", part));
         #[cfg(target_os = "windows")] {
             command_worker::add_command(&format!("Read partition {}...", part), "cmd", 
             vec!["/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", "--convertprogram2read",
@@ -455,6 +457,7 @@ async fn read_gpt(app: AppHandle) {
 
     let mut root = DataRoot{programs: Vec::new(), read_tags: Vec::new(),};
     for i in 0..6 {
+        let _ = app.emit("log_event", format!("read LUN {}...", i));
         let read_tag = xml_file_util::create_read_tag_dynamic(&format!("gpt_main{}.bin", i), i, 0, 6, "PrimaryGPT");
 
         let read_xml = xml_file_util::to_xml(&read_tag);
