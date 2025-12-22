@@ -38,6 +38,7 @@
 		readDeviceInfo: '读设备信息',
 		switchSlot: '切换槽位',
 		useBuildIn: '使用內建fh_loader',
+		protectLun5: '保护 LUN 5',
 		saveAlert: '请至少选取一个分区',
 	},
 	edl: {

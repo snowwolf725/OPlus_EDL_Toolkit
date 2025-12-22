@@ -3,15 +3,20 @@ mod file_util;
 mod gpt_parser;
 mod qdl;
 mod xml_file_util;
+mod super_image_creater;
 
 use command_worker::CommandItem;
 use serialport::{available_ports, SerialPortType};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Emitter, Error, command};
+use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use std::thread;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Error, command, State};
 use tokio::process::Command;
 use crate::xml_file_util::DataRoot;
+
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -32,6 +37,20 @@ pub struct Config {
     pub current_dir: PathBuf,
 
     pub is_connect: bool,
+}
+
+struct ThreadState {
+    running: AtomicBool,
+    thread_handle: Option<thread::JoinHandle<()>>,
+}
+
+impl Default for ThreadState {
+    fn default() -> Self {
+        ThreadState {
+            running: AtomicBool::new(false),
+            thread_handle: None,
+        }
+    }
 }
 
 fn setup_env(app: &AppHandle) -> Config {
@@ -128,6 +147,38 @@ fn print_result(app: &AppHandle, item: CommandItem) {
     } else {
         let _ = app.emit("log_event", &format!("{}...Error", item.msg));
     }
+}
+
+fn flash_program_xml(app: &AppHandle, port_path: &str, folder: &str, programs: Vec<(String, String)>) -> bool {
+    let total = programs.len();
+    let mut count = 0;
+    
+    for (label, program) in programs {
+        count += 1;
+        thread::sleep(Duration::from_secs(1));
+        
+        command_worker::flash_part(&port_path, &folder, &program);
+        println!("Flash program:{} / {}", (count * 60)/total, total);
+        let _ = app.emit("log_event", format!("Flash partition: {}", label));
+        let _ = app.emit("update_percentage", 20 + (count * 60)/total);
+    }
+    return true;
+}
+
+fn flash_patch_xml(app: &AppHandle, port_path: &str, folder: &str, files: Vec<String>) -> bool {
+    let total = files.len();
+    let mut count = 0;
+
+    for file in files {
+        count += 1;
+        thread::sleep(Duration::from_secs(1));
+
+        command_worker::flash_patch_xml(&port_path, &folder, &file);
+        println!("Flash patch:{} / {}", (count * 15)/total, total);
+        let _ = app.emit("log_event", format!("Flash patch file: {}", &file));
+        let _ = app.emit("update_percentage", 80 + (count * 15)/total);
+    }
+    return true;
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -277,7 +328,7 @@ fn write_part(app: AppHandle, xml: &str)  -> String {
     if config.is_connect == false {
         return format!("port not available");
     }
-    let items = xml_file_util::parser_program_xml(xml);
+    let items = xml_file_util::parser_program_xml("", xml);
     for (part, xml_content, dir_path) in items {
         let file_name = "res/cmd.xml";
         println!("file:{}", &file_name);
@@ -415,10 +466,10 @@ fn write_from_xml(app: AppHandle, file_path:&str) -> String {
         Ok(content) => content,
         Err(e) => format!("Error reading file: {}", e),
     };
-    let (_file_name, dir_path) = file_util::parse_file_path(file_path);
+    let (_file_name, dir_path) = file_util::parse_file_path("", file_path);
     let dir_str = format!("--search_path={}", &dir_path);
     
-    let items = xml_file_util::parser_program_xml(&xml);
+    let items = xml_file_util::parser_program_xml(&dir_path, &xml);
     for (part, xml_content, _dir_path) in items {
         let file_name = "res/cmd.xml";
         println!("file:{}", &file_name);
@@ -568,18 +619,88 @@ fn init(app: AppHandle) {
     });
 }
 
-#[tauri::command]
-fn start_flashing(app: AppHandle, path: &str) -> String {
-    let mut result = String::new();
+#[tauri::command] 
+fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, thread_state: State<Arc<Mutex<ThreadState>>>,) -> Result<(), String> {
+    // lock thread state
+    let mut state_guard = thread_state.lock().map_err(|e| format!("lock thread state faild: {}", e))?;
 
-    if file_util::check_necessary_files_in_edl_folder(&path) {
-        let _ = app.emit("log_event", &format!("Check necessary files...OK"));
-        result = format!("Check necessary files...OK");
-    } else {
-        let _ = app.emit("log_event", &format!("Check necessary files...Error"));
-        result = format!("Check necessary files...Error");
+    // if running then return
+    if state_guard.running.load(Ordering::SeqCst) {
+        return Ok(());
     }
-    return result;
+    // set status to running
+    state_guard.running.store(true, Ordering::SeqCst);
+
+    // clone state, app for thread using
+    let state_clone = thread_state.inner().clone();
+    let app_clone = app.clone();
+
+    // create thread
+    let handle = thread::spawn(move || {
+        let _ = app_clone.emit("update_percentage", 5);
+        match file_util::check_necessary_files_in_edl_folder(&path, is_protect_lun5) {
+            Ok(package) => {
+                if package.is_miss_file == false {
+                    let _ = app_clone.emit("log_event", &format!("Check necessary files...OK"));
+                    let _ = app_clone.emit("update_percentage", 10);
+                    if super_image_creater::creat_super_image(&package.super_define) == false ||
+                       state_clone.lock().unwrap().running.load(Ordering::SeqCst) == false {
+                        return;
+                    }
+                    let _ = app_clone.emit("update_percentage", 20);
+                    let (port_path, _port_info) = update_port();
+                    //if port_path == "Not found" {
+                    //    let _ = app_clone.emit("log_event", &format!("Port not available"));
+                    //    return;
+                    //}
+                    let (_file_name, dir_path) = file_util::parse_file_path("", &package.patch_files[0]);
+                    if flash_program_xml(&app_clone, &port_path, &dir_path, package.raw_programs) == false {
+                        return;
+                    }
+                    let _ = app_clone.emit("update_percentage", 80);
+                    if flash_patch_xml(&app_clone, &port_path, &dir_path, package.patch_files) == false {
+                        return;
+                    }
+                    let _ = app_clone.emit("update_percentage", 95);
+                    if command_worker::switch_slot(&port_path, "A") == false {
+                        return;
+                    }
+                    let _ = app_clone.emit("update_percentage", 100);
+                } else {
+                    let _ = app_clone.emit("log_event", &format!("Check necessary files...Error"));
+                }
+            },
+            Err(_e) => {
+                let _ = app_clone.emit("log_event", &format!("Check necessary files...Error"));
+            }
+        }
+
+        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
+
+        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
+    });
+
+    // store handler to global state
+    state_guard.thread_handle = Some(handle);
+    Ok(())
+}
+
+#[tauri::command]
+fn stop_flashing(app: AppHandle, thread_state: State<Arc<Mutex<ThreadState>>>,) -> Result<(), String> {
+    // lock thread state
+    let mut state_guard = thread_state.lock().map_err(|e| format!("lock thread state faild: {}", e))?;
+
+    // if not running then return
+    if state_guard.running.load(Ordering::SeqCst) == false {
+        return Ok(());
+    }
+
+    // set running state to false
+    state_guard.running.store(false, Ordering::SeqCst);
+
+    let _ = app.emit("log_event", "Stopping the EDL flashing operation");
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -588,9 +709,10 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .manage(Arc::new(Mutex::new(ThreadState::default())))
         .invoke_handler(tauri::generate_handler![init, update_port, send_loader, read_part, write_part, read_gpt,
         reboot_to_system, reboot_to_recovery, reboot_to_fastboot, reboot_to_edl, save_to_xml, write_from_xml, 
-        read_device_info, switch_slot, start_flashing])
+        read_device_info, switch_slot, start_flashing, stop_flashing])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -10,9 +10,10 @@
     const slotDialogRef = ref(null);
     const isDialogOpen = ref(false);
     const isBuildIn = ref(false);
+    const isProtectLun5 = ref(true);
     const activeTab = ref('tab_part');
     const activeStep = ref(1);
-    const edl_status = ref(0);
+    const isRunning = ref(false);
     const percentage = ref(0);
 
     const { t, locale, availableLocales } = useI18n();
@@ -40,6 +41,25 @@
         if (!dialog) return;
 
         newVal ? dialog.showModal() : dialog.close();
+    });
+
+    listen("update_percentage", (payload) => {
+        percentage.value = payload.payload;
+        if (percentage.value >= 100) {
+            activeStep.value = 7;
+        } else if (percentage.value >= 95) {
+            activeStep.value = 6;
+        } else if (percentage.value >= 80) {
+            activeStep.value = 5;
+        } else if (percentage.value >= 20) {
+            activeStep.value = 4;
+        } else if (percentage.value >= 10) {
+            activeStep.value = 3;
+        } else if (percentage.value >= 5) {
+            activeStep.value = 2;
+        } else {
+            activeStep.value = 1;
+        }
     });
 
     listen("log_event", (payload) => {
@@ -101,13 +121,14 @@
     }
 
     async function startFlashing() {
-        //activeStep.value = activeStep.value + 1;
-        //percentage.value = 50;
+        isRunning.value = true;
         const edlFolder = document.getElementById('edlFolderPathDisplay').value;
-        await invoke("start_flashing", { path: edlFolder });
+        await invoke("start_flashing", { path: edlFolder, isProtectLun5: isProtectLun5.value });
     }
 
     async function stopFlashing() {
+        isRunning.value = false;
+        await invoke("stop_flashing");
     }
 
     const selectImgPath = async(item) => {
@@ -746,8 +767,8 @@ setInterval(updatePort, 1000);
                                 </v-progress-circular>
                             </div>
                             <div class="edl-panel-right-bottom">
-                                <button class="edl-btn-green" v-show="edl_status == 0" @click="startFlashing()">{{ t('edl.start')}}</button>
-                                <button class="edl-btn-red" v-show="edl_status == 1" @click="stopFlashing()">{{ t('edl.stop')}}</button>
+                                <button class="edl-btn-green" v-show="isRunning == false" @click="startFlashing()">{{ t('edl.start')}}</button>
+                                <button class="edl-btn-red" v-show="isRunning == true" @click="stopFlashing()">{{ t('edl.stop')}}</button>
                             </div>
                         </div>
                         
@@ -776,6 +797,7 @@ setInterval(updatePort, 1000);
                         </div>
                         <div class="checkbox-group">
                             <label><input v-model="isBuildIn" type="checkbox">{{ t('operation.useBuildIn') }}</label>
+                            <label><input v-model="isProtectLun5" type="checkbox" checked>{{ t('operation.protectLun5') }}</label>
                         </div>
                         <div class="radio-group">
                             <label><input type="radio" name="storage" checked> UFS</label>

@@ -38,6 +38,7 @@ export default {
 		readDeviceInfo: 'Read device Info',
 		switchSlot: 'Switch Slot',
 		useBuildIn: 'Use the build-in fh_loader',
+		protectLun5: 'Protect LUN 5',
 		saveAlert: 'Please select at least one partition.',
 	},
 	edl: {

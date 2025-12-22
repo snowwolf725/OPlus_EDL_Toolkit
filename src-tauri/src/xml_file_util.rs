@@ -22,7 +22,7 @@ pub struct DataRoot {
 #[serde(rename = "program")]
 pub struct Program {
     #[serde(rename = "@start_sector")]
-    pub start_sector: u64,
+    pub start_sector: String,
     #[serde(rename = "@size_in_KB", serialize_with = "serialize_size_in_kb")]
     pub size_in_kb: f64,
     #[serde(rename = "@physical_partition_number")]
@@ -89,7 +89,7 @@ pub fn create_program_dynamic(
     let start_byte_hex = format!("{:X}", start_byte);
 
     Program {
-        start_sector,
+        start_sector: format!("{}", start_sector),
         size_in_kb,
         physical_partition_number: lun,
         part_of_single_image: false,
@@ -122,7 +122,7 @@ pub fn create_read_tag_dynamic(
     }
 }
 
-pub fn parser_program_xml(content: &str) -> Vec<(String, String, String)> {
+pub fn parser_program_xml(parent_dir: &str, content: &str) -> Vec<(String, String, String)> {
     let mut result = Vec::<(String, String, String)>::new();
     // Call the parsing function
     match from_str::<DataRoot>(&content) {
@@ -134,7 +134,7 @@ pub fn parser_program_xml(content: &str) -> Vec<(String, String, String)> {
             }
             // Iterate and print each program
             for mut program in data_root.programs {
-               let (file_name, dir_path) = file_util::parse_file_path(&program.filename);
+               let (file_name, dir_path) = file_util::parse_file_path(&parent_dir, &program.filename);
                println!("Test {}, {}, {}", &program.filename, &file_name, &dir_path);
                program.filename = file_name;
                let program_xml = match to_string(&program) {
@@ -145,6 +145,36 @@ pub fn parser_program_xml(content: &str) -> Vec<(String, String, String)> {
                };
                let xml_content = format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", program_xml);
                result.push((program.label, xml_content, dir_path));
+            }
+        }
+        Err(e) => {
+            eprint!("XML parsing failed: {}", e);
+            return result;
+        }
+    }
+    return result;
+}
+
+pub fn parser_program_xml_skip_empty(parent_dir: &str, content: &str) -> Vec<(String, String, String)> {
+    let mut result = Vec::<(String, String, String)>::new();
+    // Call the parsing function
+    match from_str::<DataRoot>(&content) {
+        Ok(data_root) => {
+            // Iterate and print each program
+            for mut program in data_root.programs {
+                if program.filename.trim().is_empty() {
+                    continue;
+                }
+                let (file_name, _dir_path) = file_util::parse_file_path(&parent_dir, &program.filename);
+
+                let program_xml = match to_string(&program) {
+                    Ok(xml) => xml,
+                    Err(_e) => {
+                        continue;
+                    }
+                };
+                let xml_content = format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", program_xml);
+                result.push((program.label, file_name, xml_content));
             }
         }
         Err(e) => {
