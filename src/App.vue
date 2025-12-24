@@ -22,6 +22,7 @@
     const tabList = ref([
         { key: 'tab_part', label: t('part.title') },
         { key: 'tab_edl', label: t('edl.title') },
+        { key: 'tab_setting', label: t('setting.title') },
     ]);
 
     const tableColumns = ref([
@@ -167,6 +168,7 @@
         tabList.value = [
             { key: 'tab_part', label: t('part.title') },
             { key: 'tab_edl', label: t('edl.title') },
+            { key: 'tab_setting', label: t('setting.title') },
         ];
     };
 
@@ -756,24 +758,24 @@ setInterval(updatePort, 1000);
                     <div class="edl-panel" v-show="activeTab === 'tab_edl'">
                         <div class="edl-panel-left">
                             <v-stepper-vertical color="blue" v-model="activeStep" hide-actions>
-                                    <v-stepper-vertical-item :complete="activeStep > 1" :subtitle="t('edl.step1')" title="Step 1" value="1">
-                                        {{ t('edl.step1_content') }}
-                                    </v-stepper-vertical-item>
-                                    <v-stepper-vertical-item :complete="activeStep > 2" :subtitle="t('edl.step2')" title="Step 2" value="2">
-                                        {{ t('edl.step2_content') }}
-                                    </v-stepper-vertical-item>
-                                    <v-stepper-vertical-item :complete="activeStep > 3" :subtitle="t('edl.step3')" title="Step 3" value="3">
-                                        {{ t('edl.step3_content') }}
-                                    </v-stepper-vertical-item>
-                                    <v-stepper-vertical-item :complete="activeStep > 4" :subtitle="t('edl.step4')" title="Step 4" value="4">
-                                        {{ t('edl.step4_content') }}
-                                    </v-stepper-vertical-item>
-                                    <v-stepper-vertical-item :complete="activeStep > 5" :subtitle="t('edl.step5')" title="Step 5" value="5">
-                                        {{ t('edl.step5_content') }}
-                                    </v-stepper-vertical-item>
-                                    <v-stepper-vertical-item :complete="activeStep > 6" :subtitle="t('edl.step6')" title="Step 6" value="6">
-                                        {{ t('edl.step6_content') }}
-                                    </v-stepper-vertical-item>
+                                <v-stepper-vertical-item :complete="activeStep > 1" :subtitle="t('edl.step1')" title="Step 1" value="1">
+                                    {{ t('edl.step1_content') }}
+                                </v-stepper-vertical-item>
+                                <v-stepper-vertical-item :complete="activeStep > 2" :subtitle="t('edl.step2')" title="Step 2" value="2">
+                                    {{ t('edl.step2_content') }}
+                                </v-stepper-vertical-item>
+                                <v-stepper-vertical-item :complete="activeStep > 3" :subtitle="t('edl.step3')" title="Step 3" value="3">
+                                    {{ t('edl.step3_content') }}
+                                </v-stepper-vertical-item>
+                                <v-stepper-vertical-item :complete="activeStep > 4" :subtitle="t('edl.step4')" title="Step 4" value="4">
+                                    {{ t('edl.step4_content') }}
+                                </v-stepper-vertical-item>
+                                <v-stepper-vertical-item :complete="activeStep > 5" :subtitle="t('edl.step5')" title="Step 5" value="5">
+                                    {{ t('edl.step5_content') }}
+                                </v-stepper-vertical-item>
+                                <v-stepper-vertical-item :complete="activeStep > 6" :subtitle="t('edl.step6')" title="Step 6" value="6">
+                                    {{ t('edl.step6_content') }}
+                                </v-stepper-vertical-item>
                             </v-stepper-vertical>
                         </div>
 
@@ -790,7 +792,22 @@ setInterval(updatePort, 1000);
                                 <button class="edl-btn-red" v-show="isRunning == true" @click="stopFlashing()">{{ t('edl.stop')}}</button>
                             </div>
                         </div>
-                        
+
+                    </div>
+                    <div class="setting-panel" v-show="activeTab === 'tab_setting'">
+                            <div class="img-folder-group">
+                                <label class="img-folder-group-title">{{ t('setting.imgSavingPath') }}</label>
+                                <textarea class="img-folder-group-path" v-model="imgSavingPath">img/</textarea>
+                                <button class="img-folder-group-btn" @click="changeSavingPath">{{ t('setting.selectImgPathBtn') }}</button>
+                            </div>
+                            <div class="checkbox-group">
+                                <label><input v-model="isBuildIn" type="checkbox">{{ t('setting.useBuildIn') }}</label>
+                                <label><input v-model="isProtectLun5" type="checkbox" checked>{{ t('setting.protectLun5') }}</label>
+                            </div>
+                            <div class="radio-group">
+                                <label><input type="radio" name="storage" checked> UFS</label>
+                                <label><input type="radio" name="storage"> EMMC</label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -810,22 +827,9 @@ setInterval(updatePort, 1000);
 
                 <!-- Operation -->
                 <div class="right-bottom-table-wrapper">
-                    <form class="row" @submit.prevent="greet">
+                    <form class="row">
                         <div class="section-title">
                             <span>{{ t('operation.title') }}</span>
-                        </div>
-                        <div class="img-folder-group">
-                            <label class="img-folder-group-title">{{ t('config.imgSavingPath') }}</label>
-                            <textarea class="img-folder-group-path" v-model="imgSavingPath">img/</textarea>
-                            <button class="img-folder-group-btn" @click="changeSavingPath">{{ t('config.selectImgPathBtn') }}</button>
-                        </div>
-                        <div class="checkbox-group">
-                            <label><input v-model="isBuildIn" type="checkbox">{{ t('operation.useBuildIn') }}</label>
-                            <label><input v-model="isProtectLun5" type="checkbox" checked>{{ t('operation.protectLun5') }}</label>
-                        </div>
-                        <div class="radio-group">
-                            <label><input type="radio" name="storage" checked> UFS</label>
-                            <label><input type="radio" name="storage"> EMMC</label>
                         </div>
                         <div class="btn-group">
                             <button class="btn-blue" @click="sendLoader">{{ t('operation.sendLoader') }}</button>
@@ -834,7 +838,7 @@ setInterval(updatePort, 1000);
                             <button class="btn-brown" @click="saveToXML">{{ t('operation.createXML') }}</button>
                             <button class="btn-blue" @click="readPart">{{ t('operation.readPart') }}</button>
                             <button class="btn-orange" @click="writePart">{{ t('operation.writePart') }}</button>
-                            <button class="btn-orange" @click="writeFromXML">{{ t('operation.writeFromXML') }}</button>
+                            <button class="btn-orange" @click="writeFromXML">{{ t('operation.runCmdFromXML') }}</button>
                             <button class="btn-red" @click="isDialogOpen = true">{{ t('operation.switchSlot') }}</button>
                         </div>
                     </form>

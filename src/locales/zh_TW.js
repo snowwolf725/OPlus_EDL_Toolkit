@@ -6,8 +6,6 @@
 		sign: 'Sign:',
 		edlFolder: 'EDL 刷機包資料夾',
 		selectBtn: '選擇',
-		imgSavingPath: '分割區映像檔保存路徑：',
-		selectImgPathBtn: '更改',
 		portStatus: 'EDL設備已連接',
 		portStatusError: '未找到EDL設備',
 	},
@@ -35,12 +33,10 @@
 		readGPT: '讀取分區表',
 		readPart: '提取選中分區',
 		writePart: '寫入選中分區',
-		writeFromXML: 'XML寫入韌體',
+		runCmdFromXML: '運行XML指令',
 		createXML: '保存至XML',
 		readDeviceInfo: '讀裝置資訊',
 		switchSlot: '切換槽位',
-		useBuildIn: '使用內建fh_loader',
-		protectLun5: '保護 LUN 5',
 		saveAlert: '請至少選取一個分割區',
 	},
 	edl: {
@@ -63,5 +59,13 @@
 	log: {
 		title: '操作日誌',
 		clearLog: '清除操作日誌',
+	},
+	setting: {
+		title: '設定',
+		imgSavingPath: '分割區映像檔保存路徑：',
+		selectImgPathBtn: '更改',
+		useBuildIn: '使用內建fh_loader',
+		protectLun5: '保護 LUN 5',
+
 	}
 }
