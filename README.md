@@ -17,11 +17,17 @@ An Oplus EDL toolkit developed with Rust.
 - Flashing involves risks. Please ensure your important data is backed up.
 
 ## 📋 Build
+* [Setup Tauri](https://v2.tauri.app/start/prerequisites/)
 ```bash
 git clone https://github.com/snowwolf725/OPlus_EDL_Toolkit.git
-npmm install
+cd OPlus_EDL_Toolkit
+npm install
 npm run tauri build
 ```
+
+## 🔔 Translation
+<!-- CROWDIN-TRANSLATIONS-PROGRESS-ACTION-START -->
+<!-- CROWDIN-TRANSLATIONS-PROGRESS-ACTION-END -->
 
 ## 🎉 Credit:
 * Special thanks to 某贼@CoolAPK for the repost.
