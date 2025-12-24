@@ -16,6 +16,9 @@
     const isRunning = ref(false);
     const percentage = ref(0);
     const imgSavingPath = ref("img/");
+    const isEnablePing = ref(true);
+    const isCommandRunning = false;
+    let isSentLoader = false;
 
     const { t, locale, availableLocales } = useI18n();
 
@@ -48,7 +51,15 @@
     listen("stop_edl_flashing", (payload) => {
         isRunning.value = false;
     });
+    
+    listen("update_command_running_status", (payload) => {
+        isCommandRunning = payload.payload;
+    });
 
+    listen("update_loader_status", (payload) => {
+        isSentLoader = payload.payload;
+    });
+    
     listen("update_percentage", (payload) => {
         percentage.value = payload.payload;
         if (percentage.value >= 100) {
@@ -386,6 +397,7 @@
         let loader = document.getElementById('loaderPathDisplay').value;
         let digest = document.getElementById('digestPathDisplay').value;
         let sig = document.getElementById('signPathDisplay').value;
+        
         await invoke("send_loader", { loader: loader, digest: digest, sig: sig, native: isBuildIn.value });
     }
 
@@ -508,6 +520,16 @@
             portName.value = "N/A";
         } else {
             portStatus.value = t('config.portStatus');
+        }
+    }
+
+    async function sendPing() {
+        if (portName.value == "N/A") {
+            isSentLoader = false;
+        }
+
+        if (isEnablePing.value && isSentLoader && isCommandRunning == false) {
+            await invoke("send_ping");
         }
     }
 
@@ -645,7 +667,8 @@
 
     }
     
-setInterval(updatePort, 1000);
+    setInterval(updatePort, 1000);
+    setInterval(sendPing, 10000);
 </script>
 
 <template>
@@ -788,28 +811,31 @@ setInterval(updatePort, 1000);
                                 </v-progress-circular>
                             </div>
                             <div class="edl-panel-right-bottom">
-                                <button class="edl-btn-green" v-show="isRunning == false" @click="startFlashing()">{{ t('edl.start')}}</button>
-                                <button class="edl-btn-red" v-show="isRunning == true" @click="stopFlashing()">{{ t('edl.stop')}}</button>
+                                <button class="edl-btn-green" v-show="isRunning == false" @click="startFlashing">{{ t('edl.start')}}</button>
+                                <button class="edl-btn-red" v-show="isRunning == true" @click="stopFlashing">{{ t('edl.stop')}}</button>
                             </div>
                         </div>
 
                     </div>
+
+                    <!-- Setting Panel -->
                     <div class="setting-panel" v-show="activeTab === 'tab_setting'">
-                            <div class="img-folder-group">
-                                <label class="img-folder-group-title">{{ t('setting.imgSavingPath') }}</label>
-                                <textarea class="img-folder-group-path" v-model="imgSavingPath">img/</textarea>
-                                <button class="img-folder-group-btn" @click="changeSavingPath">{{ t('setting.selectImgPathBtn') }}</button>
-                            </div>
-                            <div class="checkbox-group">
-                                <label><input v-model="isBuildIn" type="checkbox">{{ t('setting.useBuildIn') }}</label>
-                                <label><input v-model="isProtectLun5" type="checkbox" checked>{{ t('setting.protectLun5') }}</label>
-                            </div>
-                            <div class="radio-group">
-                                <label><input type="radio" name="storage" checked> UFS</label>
-                                <label><input type="radio" name="storage"> EMMC</label>
-                            </div>
+                        <div class="img-folder-group">
+                            <label class="img-folder-group-title">{{ t('setting.imgSavingPath') }}</label>
+                            <textarea class="img-folder-group-path" v-model="imgSavingPath">img/</textarea>
+                            <button class="img-folder-group-btn" @click="changeSavingPath">{{ t('setting.selectImgPathBtn') }}</button>
+                        </div>
+                        <div class="checkbox-group">
+                            <label><input v-model="isBuildIn" type="checkbox">{{ t('setting.useBuildIn') }}</label>
+                            <label><input v-model="isProtectLun5" type="checkbox" checked>{{ t('setting.protectLun5') }}</label>
+                            <label><input v-model="isEnablePing" type="checkbox" checked>{{ t('setting.enablePing') }}</label>
+                        </div>
+                        <div class="radio-group">
+                            <label><input type="radio" name="storage" checked> UFS</label>
+                            <label><input type="radio" name="storage"> EMMC</label>
                         </div>
                     </div>
+                </div>
                 </div>
             <div class="right-container">
                 <!-- Reboot -->
@@ -818,16 +844,16 @@ setInterval(updatePort, 1000);
                         <span>{{ t('reboot.title')}}</span>
                     </div>
                     <div class="btn-group">
-                        <button class="btn-red" @click="rebootToSystem()">{{ t('reboot.system')}}</button>
-                        <button class="btn-red" @click="rebootToEdl()">{{ t('reboot.edl')}}</button>
-                        <button class="btn-purple" @click="rebootToRecovery()">{{ t('reboot.recovery')}}</button>
-                        <button class="btn-purple" @click="rebootToFastboot()">{{ t('reboot.fastboot')}}</button>
+                        <button class="btn-red" @click="rebootToSystem">{{ t('reboot.system')}}</button>
+                        <button class="btn-red" @click="rebootToEdl">{{ t('reboot.edl')}}</button>
+                        <button class="btn-purple" @click="rebootToRecovery">{{ t('reboot.recovery')}}</button>
+                        <button class="btn-purple" @click="rebootToFastboot">{{ t('reboot.fastboot')}}</button>
                     </div>
                 </div>
 
                 <!-- Operation -->
                 <div class="right-bottom-table-wrapper">
-                    <form class="row">
+                    <form class="row" @submit.prevent="greet">
                         <div class="section-title">
                             <span>{{ t('operation.title') }}</span>
                         </div>

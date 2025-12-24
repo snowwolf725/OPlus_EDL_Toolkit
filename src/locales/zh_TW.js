@@ -66,6 +66,6 @@
 		selectImgPathBtn: '更改',
 		useBuildIn: '使用內建fh_loader',
 		protectLun5: '保護 LUN 5',
-
+		enablePing: '防止超时重啟',
 	}
 }

@@ -242,6 +242,7 @@ fn reboot_to_system(app: AppHandle) {
         command_worker::add_command("Reboot to system", &config.fh_loader_path_linux, 
         vec![&config.fh_port_conn_str_linux, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"]);
     }
+    let _ = app.emit("update_loader_status", false);
 }
 
 #[tauri::command]
@@ -276,6 +277,7 @@ fn reboot_to_recovery(app: AppHandle, xml: &str) {
             vec![&config.fh_port_conn_str_linux, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", 
             "--zlpawarehost=1", "--mainoutputdir=res"]);
     }
+    let _ = app.emit("update_loader_status", false);
 }
 
 #[tauri::command]
@@ -309,6 +311,7 @@ fn reboot_to_fastboot(app: AppHandle, xml: &str) {
             vec![&config.fh_port_conn_str_linux, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", 
             "--zlpawarehost=1", "--mainoutputdir=res"]);
     }
+    let _ = app.emit("update_loader_status", false);
 }
 
 #[tauri::command]
@@ -329,6 +332,7 @@ fn reboot_to_edl(app: AppHandle) {
             vec![&config.fh_port_conn_str_linux, "--memoryname=ufs", "--sendxml=res/cmd.xml", "--noprompt", 
             "--zlpawarehost=1", "--mainoutputdir=res"]);
     }
+    let _ = app.emit("update_loader_status", false);
 }
 
 #[tauri::command]
@@ -348,6 +352,7 @@ fn write_part(app: AppHandle, xml: &str)  -> String {
     if config.is_connect == false {
         return format!("port not available");
     }
+    let _ = app.emit("update_command_running_status", true);
     let items = xml_file_util::parser_program_xml("", xml);
     for (part, xml_content, dir_path) in items {
         let file_name = "res/cmd.xml";
@@ -374,11 +379,13 @@ fn write_part(app: AppHandle, xml: &str)  -> String {
             "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"]);
         }
     }
+    let _ = app.emit("update_command_running_status", false);
     return "".to_string();
 }
 
 #[tauri::command]
 fn read_part(app: AppHandle, xml: &str, folder: &str)  -> String {
+    let _ = app.emit("update_command_running_status", true);
     // Call the parsing function
     let config = setup_env(&app);
     let items = xml_file_util::parser_read_xml(xml);
@@ -408,6 +415,7 @@ fn read_part(app: AppHandle, xml: &str, folder: &str)  -> String {
             "--showpercentagecomplete", "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", &dir_str]);
         }
     }
+    let _ = app.emit("update_command_running_status", false);
     return "".to_string();
 }
 
@@ -472,7 +480,8 @@ fn send_loader(app: AppHandle, loader: &str, digest: &str, sig: &str, native: bo
             command_worker::add_command("Send SHA256 init", &config.fh_loader_path_linux, 
             vec![&config.fh_port_conn_str_linux, "--sendxml=res/sha256init.xml", "--memoryname=ufs", "--zlpawarehost=1", "--noprompt", "--mainoutputdir=res"]);
         }
-        
+        let _ = app.emit("update_loader_status", true);
+        let _ = app.emit("update_command_running_status", false);
     }
     format!("OK")
 }
@@ -483,6 +492,7 @@ fn write_from_xml(app: AppHandle, file_path:&str) -> String {
     if config.is_connect == false {
         return format!("Port not available");
     }
+    let _ = app.emit("update_command_running_status", true);
     let xml = match file_util::read_text_file(file_path) {
         Ok(content) => content,
         Err(e) => format!("Error reading file: {}", e),
@@ -517,6 +527,7 @@ fn write_from_xml(app: AppHandle, file_path:&str) -> String {
                  "--sendxml=res/cmd.xml","--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"]);
         }
     }
+    let _ = app.emit("update_command_running_status", false);
     return "".to_string();
 }
 
@@ -527,6 +538,7 @@ async fn read_gpt(app: AppHandle) {
         return ();
     }
 
+    let _ = app.emit("update_command_running_status", true);
     let mut root = DataRoot{programs: Vec::new(), read_tags: Vec::new(),};
     for i in 0..6 {
         let _ = app.emit("log_event", format!("read LUN {}...", i));
@@ -572,6 +584,7 @@ async fn read_gpt(app: AppHandle) {
 
     let read_xml = xml_file_util::to_xml(&root);
     let _ = app.emit("update_partition_table", &read_xml);
+    let _ = app.emit("update_command_running_status", false);
 }
 
 #[tauri::command]
@@ -580,6 +593,8 @@ async fn read_device_info(app: AppHandle) -> String {
     if config.is_connect == false {
         return "Device not found".to_string();
     }
+
+    let _ = app.emit("update_command_running_status", true);
     let cmd = "<?xml version=\"1.0\" ?><data><getstorageinfo physical_partition_number=\"0\" /></data>";
     file_util::write_to_file("cmd.xml", "res", &cmd);
     let _ = app.emit("log_event", &format!("Read Device Info..."));
@@ -599,6 +614,7 @@ async fn read_device_info(app: AppHandle) -> String {
             return file_util::analysis_info(&result);
         }
     }
+    let _ = app.emit("update_command_running_status", false);
     return "".to_string();
 }
 
@@ -608,13 +624,14 @@ async fn switch_slot(app: AppHandle, slot: &str) -> Result<String, Error> {
     if config.is_connect == false {
         return Err(tauri::Error::AssetNotFound("Device not found".to_string()));
     }
+    let _ = app.emit("update_command_running_status", true);
     let cmd = if slot == "A" {
         "<?xml version=\"1.0\" ?><data><setbootablestoragedrive value=\"1\" /></data>".to_string()
     } else {
         "<?xml version=\"1.0\" ?><data><setbootablestoragedrive value=\"2\" /></data>".to_string()
     };
     file_util::write_to_file("cmd.xml", "res", &cmd);
-    let _ = app.emit("log_event", &format!("Reboot to EDL..."));
+    let _ = app.emit("log_event", &format!("Set slot to {}...", slot));
     let mut result = String::new();
     #[cfg(target_os = "windows")] {
         let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", 
@@ -626,6 +643,7 @@ async fn switch_slot(app: AppHandle, slot: &str) -> Result<String, Error> {
                    "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"];
         result = exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
     }
+    let _ = app.emit("update_command_running_status", false);
     return Ok(result);
 }
 
@@ -658,6 +676,7 @@ fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, thread_st
 
     // create thread
     let handle = thread::spawn(move || {
+        let _ = app_clone.emit("update_command_running_status", true);
         let _ = app_clone.emit("update_percentage", 5);
         match file_util::check_necessary_files_in_edl_folder(&path, is_protect_lun5) {
             Ok(package) => {
@@ -670,39 +689,46 @@ fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, thread_st
                         let _ = app_clone.emit("log_event", "Failed to create Super image.");
                         let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
                         state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
+                        let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     if state_clone.lock().unwrap().running.load(Ordering::SeqCst) == false {
                         let _ = app_clone.emit("log_event", "Operation canceled by user");
                         let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
+                        let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     let _ = app_clone.emit("log_event", &format!("Merge Super image...OK"));
                     let _ = app_clone.emit("update_percentage", 20);
                     let (port_path, _port_info) = update_port();
-                    //if port_path == "Not found" {
-                    //    let _ = app_clone.emit("log_event", &format!("Port not available"));
-                    //    return;
-                    //}
+                    if port_path == "Not found" {
+                        let _ = app_clone.emit("log_event", &format!("Port not available"));
+                        let _ = app_clone.emit("update_command_running_status", false);
+                        return;
+                    }
                     let (_file_name, dir_path) = file_util::parse_file_path("", &package.patch_files[0]);
                     if flash_program_xml(&state_clone, &app_clone, &port_path, &dir_path, package.raw_programs) == false {
                         let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
                         state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
+                        let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     let _ = app_clone.emit("update_percentage", 80);
                     if flash_patch_xml(&state_clone, &app_clone, &port_path, &dir_path, package.patch_files) == false {
                         let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
                         state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
+                        let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     let _ = app_clone.emit("update_percentage", 95);
                     if command_worker::switch_slot(&port_path, "A") == false {
                         let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
                         state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
+                        let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     let _ = app_clone.emit("update_percentage", 100);
+                    let _ = app_clone.emit("update_command_running_status", false);
                 } else {
                     let _ = app_clone.emit("log_event", &format!("Check necessary files...Error"));
                 }
@@ -739,6 +765,29 @@ fn stop_flashing(app: AppHandle, thread_state: State<Arc<Mutex<ThreadState>>>,) 
     Ok(())
 }
 
+#[tauri::command]
+async fn send_ping(app: AppHandle) {
+    let config = setup_env(&app);
+    if config.is_connect == false {
+        let _ = app.emit("log_event", "Device not found");
+        return;
+    }
+    let cmd = "<?xml version=\"1.0\" ?><data><nop verbose=\"0\" value=\"ping\"/></data>".to_string();
+    file_util::write_to_file("cmd.xml", "res", &cmd);
+    let _ = app.emit("log_event", "Send Ping Command");
+    let mut result = String::new();
+    #[cfg(target_os = "windows")] {
+        let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", 
+                   "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
+        result = exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
+    }
+    #[cfg(target_os = "linux")] {
+        let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", 
+                   "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"];
+        result = exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -748,7 +797,7 @@ pub fn run() {
         .manage(Arc::new(Mutex::new(ThreadState::default())))
         .invoke_handler(tauri::generate_handler![init, update_port, send_loader, read_part, write_part, read_gpt,
         reboot_to_system, reboot_to_recovery, reboot_to_fastboot, reboot_to_edl, save_to_xml, write_from_xml, 
-        read_device_info, switch_slot, start_flashing, stop_flashing])
+        read_device_info, switch_slot, start_flashing, stop_flashing, send_ping])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
