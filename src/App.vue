@@ -695,8 +695,9 @@
             </div>
             <select class="header-right" name="language" id="language-select" v-model="selectedLang" @change="handleSelectLangChange">
                 <option value="en">English</option>
-                <option value="zh_TW">正體中文</option>
-                <option value="zh_CN">简体中文</option>
+                <option value="ru">Russian (русский язык)</option>
+                <option value="zh_CN">Simplified  Chinese (简体中文)</option>
+                <option value="zh_TW">Traditional Chinese (正體中文)</option>
             </select>
         </div>
 

@@ -66,5 +66,6 @@ export default {
 		selectImgPathBtn: 'Изменить',
 		useBuildIn: 'Использовать встроенный fh_loader',
 		protectLun5: 'Защита LUN 5',
+		enablePing: 'Предотвратить перезапуск из-за тайм-аута',
 	}
 }
