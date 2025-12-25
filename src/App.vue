@@ -19,6 +19,11 @@
     const isEnablePing = ref(true);
     const isCommandRunning = false;
     let isSentLoader = false;
+    let name = ref("");
+    let portStatus = ref("EDL device not found");
+    let portName = ref("N/A");
+    let portNum = ref("");
+    const selectedLang = ref('en');
 
     const { t, locale, availableLocales } = useI18n();
 
@@ -118,36 +123,6 @@
         }
     });
 
-    let greetMsg = ref("");
-    let name = ref("");
-    let portStatus = ref("EDL device not found");
-    let portName = ref("N/A");
-    let portNum = ref("");
-
-    async function selectAll() {
-        let isFirst = true;
-        let state = false;
-        tableData.value.forEach((item, index) => {
-            if (isFirst) {
-                isFirst = false;
-                state = !item.chk;
-                console.log(state);
-            }
-            item.chk = state;
-        });
-    }
-
-    async function startFlashing() {
-        isRunning.value = true;
-        const edlFolder = document.getElementById('edlFolderPathDisplay').value;
-        await invoke("start_flashing", { path: edlFolder, isProtectLun5: isProtectLun5.value });
-    }
-
-    async function stopFlashing() {
-        isRunning.value = false;
-        await invoke("stop_flashing");
-    }
-
     const selectImgPath = async(item) => {
         try {
             const file = await open({
@@ -161,8 +136,6 @@
             console.error('Error occurred while selecting a file:', error);
         }
     }
-
-    const selectedLang = ref('en');
 
     const handleSelectLangChange = (e) => {
         locale.value = selectedLang.value;
@@ -182,21 +155,42 @@
             { key: 'tab_setting', label: t('setting.title') },
         ];
     };
-
-    async function rebootToSystem() {
-        await invoke("reboot_to_system");
+    
+    async function changeSavingPath() {
+        try {
+            const dir = await open({
+                multiple: false,
+                directory: true,
+            });
+            if (dir) {
+                imgSavingPath.value = dir;
+            }
+        } catch (error) {
+            console.error('Error occurred while selecting a folder:', error);
+        }
     }
 
-    async function rebootToRecovery() {
+    async function clearLog() {
+        logContainer.innerHTML = "";
+    }
+
+    async function readDeviceInfo() {
+        let result = await invoke("read_device_info");
+        alert(result);
+    }
+
+    async function readGPT() {
+        await invoke("read_gpt");
+    }
+
+    async function readPart() {
         const builder = new XMLBuilder({
             ignoreAttributes: false,
             format: true,
-            suppressBooleanAttributes: false,
-            suppressEmptyNode: true,
         });
-        let programs = [];
+        let reads = [];
         const data = {
-            program: programs
+            read: reads
         };
         const jsObj = {
             "?xml": {
@@ -204,10 +198,8 @@
             },
             data: data
         };
-        let isFound = false;
         tableData.value.forEach((item, index) => {
-            if (item.partName == "misc") {
-                isFound = true;
+            if (item.chk) {
                 const num = item.lun;
                 const partname = item.partName;
                 let part_size = item.partSize;
@@ -217,34 +209,24 @@
                 if (part_size.length >= 2) {
                     part_size = part_size.slice(0, -2);
                 }
-                let start_byte_hex = "";
-                if (isNaN(num) == false) {
-                    start_byte_hex = parseInt(part_start_sector) * 4096;
-                    start_byte_hex = '0x' + start_byte_hex.toString(16);
-                }
 
-                programs.push({
-                    "@_start_sector": part_start_sector,
-                    "@_size_in_KB": part_size,
+                reads.push({
+                    "@_filename": partname + ".img",
                     "@_physical_partition_number": num,
-                    "@_partofsingleimage": "false",
-                    "@_file_sector_offset": "0",
+                    "@_label": partname,
+                    "@_start_sector": part_start_sector,
                     "@_num_partition_sectors": part_num,
-                    "@_readbackverify": "false",
-                    "@_filename": "misc_torecovery.img",
-                    "@_sparse": item.sparse,
-                    "@_start_byte_hex": start_byte_hex,
                     "@_SECTOR_SIZE_IN_BYTES": "4096",
-                    "@_label": partname
+                    "@_sparse": "false"
                 });
             }
         });
-        if (isFound) {
-            const xmlContent = builder.build(jsObj);
-            await invoke("reboot_to_recovery", { xml: xmlContent });
-        } else {
-            alert(t('reboot.miscNotFound'));
-        }
+        const xmlContent = builder.build(jsObj);
+        await invoke("read_part", { xml: xmlContent, folder: imgSavingPath.value });
+    }
+
+    async function rebootToEdl() {
+        await invoke("reboot_to_edl");
     }
 
     async function rebootToFastboot() {
@@ -307,27 +289,68 @@
         }
     }
 
-    async function rebootToEdl() {
-        await invoke("reboot_to_edl");
-    }
+    async function rebootToRecovery() {
+        const builder = new XMLBuilder({
+            ignoreAttributes: false,
+            format: true,
+            suppressBooleanAttributes: false,
+            suppressEmptyNode: true,
+        });
+        let programs = [];
+        const data = {
+            program: programs
+        };
+        const jsObj = {
+            "?xml": {
+                "@_version": "1.0"
+            },
+            data: data
+        };
+        let isFound = false;
+        tableData.value.forEach((item, index) => {
+            if (item.partName == "misc") {
+                isFound = true;
+                const num = item.lun;
+                const partname = item.partName;
+                let part_size = item.partSize;
+                let part_start_sector = item.partStart;
+                const part_num = item.partNum;
 
-    async function clearLog() {
-        logContainer.innerHTML = "";
-    }
+                if (part_size.length >= 2) {
+                    part_size = part_size.slice(0, -2);
+                }
+                let start_byte_hex = "";
+                if (isNaN(num) == false) {
+                    start_byte_hex = parseInt(part_start_sector) * 4096;
+                    start_byte_hex = '0x' + start_byte_hex.toString(16);
+                }
 
-    async function writeFromXML() {
-        try {
-            const file = await open({
-                multiple: false,
-                directory: false,
-                filters: [{ name: 'XML file', extensions: ['xml'] }],
-            });
-            if (file) {
-                await invoke("write_from_xml", { file_path: file });
+                programs.push({
+                    "@_start_sector": part_start_sector,
+                    "@_size_in_KB": part_size,
+                    "@_physical_partition_number": num,
+                    "@_partofsingleimage": "false",
+                    "@_file_sector_offset": "0",
+                    "@_num_partition_sectors": part_num,
+                    "@_readbackverify": "false",
+                    "@_filename": "misc_torecovery.img",
+                    "@_sparse": item.sparse,
+                    "@_start_byte_hex": start_byte_hex,
+                    "@_SECTOR_SIZE_IN_BYTES": "4096",
+                    "@_label": partname
+                });
             }
-        } catch (error) {
-            console.error('Error occurred while selecting a file:', error);
+        });
+        if (isFound) {
+            const xmlContent = builder.build(jsObj);
+            await invoke("reboot_to_recovery", { xml: xmlContent });
+        } else {
+            alert(t('reboot.miscNotFound'));
         }
+    }
+
+    async function rebootToSystem() {
+        await invoke("reboot_to_system");
     }
 
     async function saveToXML() {
@@ -386,7 +409,7 @@
             //await writeTextFile('file.xml', xmlContent, { baseDir: BaseDirectory.AppConfig, });
             const path = await save({ filters: [{ name: 'XML file', extensions: ['xml'] }] });
             if (path != null) {
-                await invoke("save_to_xml", { path:path, xml: xmlContent });
+                await invoke("save_to_xml", { path: path, xml: xmlContent });
             }
         } else {
             alert(t('operation.saveAlert'));
@@ -397,64 +420,74 @@
         let loader = document.getElementById('loaderPathDisplay').value;
         let digest = document.getElementById('digestPathDisplay').value;
         let sig = document.getElementById('signPathDisplay').value;
-        
+
         await invoke("send_loader", { loader: loader, digest: digest, sig: sig, native: isBuildIn.value });
     }
 
-    async function changeSavingPath() {
-        try {
-            const dir = await open({
-                multiple: false,
-                directory: true,
-            });
-            if (dir) {
-                imgSavingPath.value = dir;
-            }
-        } catch (error) {
-            console.error('Error occurred while selecting a folder:', error);
+    async function sendPing() {
+        if (portName.value == "N/A") {
+            isSentLoader = false;
+        }
+
+        if (isEnablePing.value && isSentLoader && isCommandRunning == false) {
+            await invoke("send_ping");
         }
     }
 
-    async function readPart() {
-        const builder = new XMLBuilder({
-            ignoreAttributes: false,
-            format: true,
-        });
-        let reads = [];
-        const data = {
-            read: reads
-        };
-        const jsObj = {
-            "?xml": {
-                "@_version": "1.0"
-            },
-            data: data
-        };
+    async function selectAll() {
+        let isFirst = true;
+        let state = false;
         tableData.value.forEach((item, index) => {
-            if (item.chk) {
-                const num = item.lun;
-                const partname = item.partName;
-                let part_size = item.partSize;
-                let part_start_sector = item.partStart;
-                const part_num = item.partNum;
-
-                if (part_size.length >= 2) {
-                    part_size = part_size.slice(0, -2);
-                }
-
-                reads.push({
-                    "@_filename": partname + ".img",
-                    "@_physical_partition_number": num,
-                    "@_label": partname,
-                    "@_start_sector": part_start_sector,
-                    "@_num_partition_sectors": part_num,
-                    "@_SECTOR_SIZE_IN_BYTES": "4096",
-                    "@_sparse": "false"
-                });
+            if (isFirst) {
+                isFirst = false;
+                state = !item.chk;
+                console.log(state);
             }
+            item.chk = state;
         });
-        const xmlContent = builder.build(jsObj);
-        await invoke("read_part", { xml: xmlContent, folder: imgSavingPath.value });
+    }
+
+    async function startFlashing() {
+        isRunning.value = true;
+        const edlFolder = document.getElementById('edlFolderPathDisplay').value;
+        await invoke("start_flashing", { path: edlFolder, isProtectLun5: isProtectLun5.value });
+    }
+
+    async function stopFlashing() {
+        isRunning.value = false;
+        await invoke("stop_flashing");
+    }
+
+    async function switchSlot(slot) {
+        isDialogOpen.value = false;
+        await invoke("switch_slot", {slot: slot});
+    }
+
+    async function updatePort() {
+        const [num, name] = await invoke("update_port");
+        portNum.value = num;
+        portName.value = name;
+        if (portNum.value == "Not found") {
+            portStatus.value = t('config.portStatusError');
+            portName.value = "N/A";
+        } else {
+            portStatus.value = t('config.portStatus');
+        }
+    }
+
+    async function writeFromXML() {
+        try {
+            const file = await open({
+                multiple: false,
+                directory: false,
+                filters: [{ name: 'XML file', extensions: ['xml'] }],
+            });
+            if (file) {
+                await invoke("write_from_xml", { file_path: file });
+            }
+        } catch (error) {
+            console.error('Error occurred while selecting a file:', error);
+        }
     }
 
     async function writePart() {
@@ -509,42 +542,6 @@
         });
         const xmlContent = builder.build(jsObj);
         await invoke("write_part", { xml: xmlContent });
-    }
-
-    async function updatePort() {
-        const [num, name] = await invoke("update_port");
-        portNum.value = num;
-        portName.value = name;
-        if (portNum.value == "Not found") {
-            portStatus.value = t('config.portStatusError');
-            portName.value = "N/A";
-        } else {
-            portStatus.value = t('config.portStatus');
-        }
-    }
-
-    async function sendPing() {
-        if (portName.value == "N/A") {
-            isSentLoader = false;
-        }
-
-        if (isEnablePing.value && isSentLoader && isCommandRunning == false) {
-            await invoke("send_ping");
-        }
-    }
-
-    async function readGPT() {
-        await invoke("read_gpt");
-    }
-
-    async function readDeviceInfo() {
-        let result = await invoke("read_device_info");
-        alert(result);
-    }
-
-    async function switchSlot(slot) {
-        isDialogOpen.value = false;
-        await invoke("switch_slot", {slot: slot});
     }
 
     window.onload = function () {
@@ -674,7 +671,7 @@
 <template>
     <dialog ref="slotDialogRef"
             class="slot-dialog">
-        <h3 class="dialog-title">选择启动槽位</h3>
+        <h3 class="dialog-title">{{ t('operation.switchSlot') }}</h3>
         <div class="dialog-btn-group">
             <button class="slot-btn slot-btn-a"
                     @click="switchSlot('A')">
@@ -700,7 +697,6 @@
                 <option value="zh_TW">Traditional Chinese (正體中文)</option>
             </select>
         </div>
-
         <!-- Main Content -->
         <div class="main-content">
             <div class="left-container">
@@ -735,7 +731,6 @@
                         <button class="select-btn" id="btn_selectEdlFolder">{{ t('config.selectBtn')}}</button>
                     </div>
                 </div>
-
                 <div class="left-bottom-table-wrapper">
                     <div class="tab-nav">
                         <div v-for="tab in tabList"
@@ -746,7 +741,6 @@
                             {{ tab.label }}
                         </div>
                     </div>
-
                     <!-- Device Partition Table -->
                     <div class="part-table" v-show="activeTab === 'tab_part'">
                         <div class="table-header">
@@ -777,7 +771,6 @@
                             </table>
                         </div>
                     </div>
-
                     <!-- EDL Package Panel -->
                     <div class="edl-panel" v-show="activeTab === 'tab_edl'">
                         <div class="edl-panel-left">
@@ -802,7 +795,6 @@
                                 </v-stepper-vertical-item>
                             </v-stepper-vertical>
                         </div>
-
                         <div class="edl-panel-right">
                             <div class="edl-panel-right-top">
                                 <v-progress-circular :model-value="percentage" :rotate="360" :size="100" :width="15" color="#03fc5a">
@@ -816,9 +808,7 @@
                                 <button class="edl-btn-red" v-show="isRunning == true" @click="stopFlashing">{{ t('edl.stop')}}</button>
                             </div>
                         </div>
-
                     </div>
-
                     <!-- Setting Panel -->
                     <div class="setting-panel" v-show="activeTab === 'tab_setting'">
                         <div class="img-folder-group">
@@ -837,7 +827,7 @@
                         </div>
                     </div>
                 </div>
-                </div>
+            </div>
             <div class="right-container">
                 <!-- Reboot -->
                 <div class="right-top-table-wrapper">
@@ -851,10 +841,9 @@
                         <button class="btn-purple" @click="rebootToFastboot">{{ t('reboot.fastboot')}}</button>
                     </div>
                 </div>
-
                 <!-- Operation -->
                 <div class="right-bottom-table-wrapper">
-                    <form class="row" @submit.prevent="greet">
+                    <div class="row">
                         <div class="section-title">
                             <span>{{ t('operation.title') }}</span>
                         </div>
@@ -868,9 +857,8 @@
                             <button class="btn-orange" @click="writeFromXML">{{ t('operation.runCmdFromXML') }}</button>
                             <button class="btn-red" @click="isDialogOpen = true">{{ t('operation.switchSlot') }}</button>
                         </div>
-                    </form>
+                    </div>
                 </div>
-
                 <!-- Log -->
                 <div class="right-bottom-table-wrapper2">
                     <div class="section-title">
@@ -881,7 +869,6 @@
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 </template>
