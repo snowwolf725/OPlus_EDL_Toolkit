@@ -174,6 +174,40 @@
         logContainer.innerHTML = "";
     }
 
+    async function erasePart() {
+        const builder = new XMLBuilder({
+            ignoreAttributes: false,
+            format: true,
+        });
+        let parts = [];
+        const data = {
+            erase: parts
+        };
+        const jsObj = {
+            "?xml": {
+                "@_version": "1.0"
+            },
+            data: data
+        };
+        tableData.value.forEach((item, index) => {
+            if (item.chk) {
+                const num = item.lun;
+                const partname = item.partName;
+                let part_start_sector = item.partStart;
+
+                parts.push({
+                    "@_SECTOR_SIZE_IN_BYTES": "4096",
+                    "@_label": partname,
+                    "@_physical_partition_number": num,
+                    "@_start_sector": part_start_sector,
+                    "@_num_partition_sectors": part_num,
+                });
+            }
+        });
+        const xmlContent = builder.build(jsObj);
+        await invoke("erase_part", { xml: xmlContent });
+    }
+
     async function readDeviceInfo() {
         let result = await invoke("read_device_info");
         alert(result);
@@ -854,6 +888,7 @@
                             <button class="btn-brown" @click="saveToXML">{{ t('operation.createXML') }}</button>
                             <button class="btn-blue" @click="readPart">{{ t('operation.readPart') }}</button>
                             <button class="btn-orange" @click="writePart">{{ t('operation.writePart') }}</button>
+                            <button class="btn-orange" @click="erasePart">{{ t('operation.erasePart') }}</button>
                             <button class="btn-orange" @click="writeFromXML">{{ t('operation.runCmdFromXML') }}</button>
                             <button class="btn-red" @click="isDialogOpen = true">{{ t('operation.switchSlot') }}</button>
                         </div>

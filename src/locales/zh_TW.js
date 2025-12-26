@@ -33,6 +33,7 @@
 		readGPT: '讀取分區表',
 		readPart: '提取選中分區',
 		writePart: '寫入選中分區',
+		erasePart: '擦除選中分區',
 		runCmdFromXML: '運行XML指令',
 		createXML: '保存至XML',
 		readDeviceInfo: '讀裝置資訊',

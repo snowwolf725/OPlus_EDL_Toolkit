@@ -33,6 +33,7 @@ export default {
 		readGPT: 'Read GPT',
 		readPart: 'Read Partition',
 		writePart: 'Write Partition',
+		erasePart: 'Erase Partition',
 		runCmdFromXML: 'Run XML command',
 		createXML: 'Save to XML',
 		readDeviceInfo: 'Read device Info',

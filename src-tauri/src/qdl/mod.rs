@@ -95,7 +95,7 @@ impl SaharaClient {
                 );
                 
                 // If we're past Sahara, activate the Firehose reset-on-drop listener
-                self.channel.reset_on_drop = true;
+                //self.channel.reset_on_drop = true;
 
                 // Get any "welcome" logs
                 let _ = firehose_read(&mut self.channel, firehose_parser_ack_nak);

@@ -203,6 +203,41 @@ fn setup_env(app: &AppHandle) -> Config {
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
+async fn erase_part(app: AppHandle, xml: &str) -> Result<(), Error> {
+    let _ = app.emit("update_command_running_status", true);
+    // Call the parsing function
+    let config = setup_env(&app);
+    let items = xml_file_util::parser_erase_xml(xml);
+    for (part, xml_content) in items {
+        let file_name = "res/cmd.xml";
+        println!("file:{}", &file_name);
+        if let Err(e) = fs::write(&file_name, xml_content) {
+            eprintln!("file{}failed:{}", file_name, e);
+            continue;
+        } else {
+            println!("success:{}", file_name);
+        }
+
+        if config.is_connect == false {
+            return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+        }
+        let _ = app.emit("log_event", format!("Start erasing partition {}", part));
+        #[cfg(target_os = "windows")] {
+            command_worker::add_command(&format!("Erase partition {}...", part), "cmd", 
+            vec!["/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", "--convertprogram2read",
+            "--showpercentagecomplete", "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"]);
+        }
+        #[cfg(target_os = "linux")] {
+            command_worker::add_command(&format!("Erase partition {}...", part), &config.fh_loader_path_linux,
+            vec![&config.fh_port_conn_str_linux, "--memoryname=ufs", "--convertprogram2read",
+            "--showpercentagecomplete", "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"]);
+        }
+    }
+    let _ = app.emit("update_command_running_status", false);
+    Ok(())
+}
+
+#[tauri::command]
 fn init(app: AppHandle) {
     let receiver = command_worker::init_worker();
     let value = app.clone();
@@ -252,7 +287,7 @@ async fn read_gpt(app: AppHandle) {
     }
 
     let _ = app.emit("update_command_running_status", true);
-    let mut root = DataRoot{programs: Vec::new(), read_tags: Vec::new(),};
+    let mut root = DataRoot{programs: Vec::new(), read_tags: Vec::new(), erase_tags: Vec::new()};
     for i in 0..6 {
         let _ = app.emit("log_event", format!("read LUN {}...", i));
         let read_tag = xml_file_util::create_read_tag_dynamic(&format!("gpt_main{}.bin", i), i, 0, 6, "PrimaryGPT");
@@ -795,7 +830,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Arc::new(Mutex::new(ThreadState::default())))
-        .invoke_handler(tauri::generate_handler![init, read_device_info, read_gpt, read_part, 
+        .invoke_handler(tauri::generate_handler![erase_part, init, read_device_info, read_gpt, read_part, 
         reboot_to_edl, reboot_to_fastboot, reboot_to_recovery, reboot_to_system, 
         save_to_xml, send_ping, send_loader, start_flashing, stop_flashing, switch_slot, update_port, write_from_xml, write_part])
         .run(tauri::generate_context!())

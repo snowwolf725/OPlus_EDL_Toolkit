@@ -15,6 +15,10 @@ pub struct DataRoot {
     // Match multiple <read> child nodes under <data>
     #[serde(rename = "read", default)]
     pub read_tags: Vec<ReadTag>,
+
+    // Match multiple <erase> child nodes under <data>
+    #[serde(rename = "erase", default)]
+    pub erase_tags: Vec<EraseTag>,
 }
 
 // Define struct for the <program> node (matches all attributes)
@@ -45,6 +49,23 @@ pub struct Program {
     pub sector_size_in_bytes: u64,
     #[serde(rename = "@label")]
     pub label: String,
+}
+
+// Define struct for the <read> node (matches all attributes)
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[serde(rename = "erase")]
+pub struct EraseTag {
+    #[serde(rename = "@SECTOR_SIZE_IN_BYTES")]
+    pub sector_size_in_bytes: u64,
+    #[serde(rename = "@label")]
+    pub label: String,
+    #[serde(rename = "@physical_partition_number")]
+    pub physical_partition_number: u8,
+    #[serde(rename = "@start_sector")]
+    pub start_sector: u64,
+    #[serde(rename = "@num_partition_sectors")]
+    pub num_partition_sectors: u64,
+    
 }
 
 // Define struct for the <read> node (matches all attributes)
@@ -184,6 +205,37 @@ pub fn parser_program_xml_skip_empty(parent_dir: &str, content: &str) -> Vec<(St
     }
     return result;
 }
+
+pub fn parser_erase_xml(content: &str) -> Vec<(String, String)> {
+    let mut result = Vec::<(String, String)>::new();
+    // Call the parsing function
+    match from_str::<DataRoot>(&content) {
+        Ok(data_root) => {
+            let output_dir = "res";
+            if let Err(e) = file_util::create_dir_if_not_exists(output_dir) {
+                eprint!("create res dir failed:{}", e);
+                return result;
+            }
+            // Iterate and print each tag
+            for tag in data_root.erase_tags {
+               let erase_xml = match to_string(&tag) {
+                    Ok(xml) => xml,
+                    Err(_e) => {
+                        continue;
+                    }
+                };
+               let xml_content = format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", erase_xml);
+               result.push((tag.label, xml_content));
+            }
+        }
+        Err(e) => {
+            eprint!("XML parsing failed: {}", e);
+            return result;
+        }
+    }
+    return result;
+}
+
 
 pub fn parser_read_xml(content: &str) -> Vec<(String, String)> {
     let mut result = Vec::<(String, String)>::new();

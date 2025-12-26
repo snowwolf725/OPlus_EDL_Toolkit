@@ -22,9 +22,11 @@ pub enum JsonParseError {
 #[serde(rename_all = "snake_case")] // Ensure field names match JSON's snake_case convention
 pub struct PartitionConfig {
     pub super_meta: SuperMeta,
+    #[allow(dead_code)]
     pub nv_text: String,
     pub block_devices: Vec<BlockDevice>,
     pub groups: Vec<Group>,
+    #[allow(dead_code)]
     pub nv_id: String,
     pub partitions: Vec<Partition>,
 }
@@ -33,6 +35,7 @@ pub struct PartitionConfig {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct SuperMeta {
+    #[allow(dead_code)]
     pub path: String,
     pub size: String, // Size stored as string (JSON uses string-encoded numbers; convert later if needed)
 }
@@ -43,6 +46,7 @@ pub struct SuperMeta {
 pub struct BlockDevice {
     pub block_size: String,
     pub name: String,
+    #[allow(dead_code)]
     pub alignment: String,
     pub size: String,
 }
@@ -60,6 +64,7 @@ pub struct Group {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Partition {
+    #[allow(dead_code)]
     pub is_dynamic: bool,
     pub name: String,
     pub group_name: String,
