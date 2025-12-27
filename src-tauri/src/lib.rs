@@ -1,4 +1,5 @@
-﻿mod command_worker;
+﻿mod command_util;
+mod command_worker;
 mod file_util;
 mod gpt_parser;
 mod qdl;
@@ -9,35 +10,12 @@ use command_worker::CommandItem;
 use serialport::{available_ports, SerialPortType};
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Error, command, State};
-use tokio::process::Command;
+use tauri::{AppHandle, Emitter, Error, State};
 use crate::xml_file_util::DataRoot;
-
-
-#[derive(Debug, Clone)]
-pub struct Config {
-    pub fh_loader_path: String,
-    
-    pub sahara_server_path: String,
-
-    pub fh_loader_path_linux: String,
-    
-    pub sahara_server_path_linux: String,
-
-    pub fh_port_conn_str: String,
-
-    pub sahara_port_conn_str: String,
-
-    pub fh_port_conn_str_linux: String,
-
-    pub current_dir: PathBuf,
-
-    pub is_connect: bool,
-}
 
 struct ThreadState {
     running: AtomicBool,
@@ -51,49 +29,6 @@ impl Default for ThreadState {
             thread_handle: None,
         }
     }
-}
-
-async fn exec_cmd(app: &AppHandle, cmd: &[&str], current_dir:&Path) -> String {
-    if cmd.is_empty() {
-        let _ = app.emit("log_event", "[Error]");
-        return "[Error] cmd is empty".to_string();
-    }
-    let mut exe_cmd = Command::new(cmd[0]);
-    #[cfg(target_os = "windows")]
-    {
-      exe_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW constant
-    }
-    let mut cmd_str = format!("{} ", cmd[0]);
-    for (_index, s) in cmd.iter().enumerate() {
-        if _index != 0 {
-            exe_cmd.arg(s);
-            cmd_str = format!("{} {}", cmd_str, s);
-        }
-    }
-    let _ = app.emit("log_event", &format!("{}", cmd_str));
-    let output = exe_cmd.current_dir(current_dir).output().await;
-    
-    let result = match output {
-        Ok(output) => {
-            if output.status.success() {
-                let _ = app.emit("log_event", "[OK]");
-                println!("{}",String::from_utf8_lossy(&output.stdout).to_string());
-                String::from_utf8_lossy(&output.stdout).to_string()
-            } else {
-                let _ = app.emit("log_event", "[Error]");
-                let err_msg = String::from_utf8_lossy(&output.stderr).to_string();
-                println!("[Error]: {}", err_msg);
-                format!("[Error]: {}", err_msg)
-            }
-        }
-        Err(e) => {
-            let _ = app.emit("log_event", "[Error]");
-            let err_msg = format!("Execution failed: {}", e);
-            println!("[Error]: {}", err_msg);
-            format!("[Error]: {}", err_msg)
-        }
-    };
-    return result;
 }
 
 fn flash_patch_xml(state: &Arc<std::sync::Mutex<ThreadState>>, app: &AppHandle, 
@@ -158,55 +93,16 @@ fn print_result(app: &AppHandle, item: CommandItem) {
     }
 }
 
-fn setup_env(app: &AppHandle) -> Config {
-    let mut config = Config {
-        fh_loader_path: String::new(),
-        sahara_server_path: String::new(),
-        fh_loader_path_linux: String::new(),
-        sahara_server_path_linux: String::new(),
-        fh_port_conn_str: String::new(),
-        sahara_port_conn_str: String::new(),
-        fh_port_conn_str_linux: String::new(),
-        current_dir: PathBuf::new(),
-        is_connect: false,
-    };
-    let (port_path, _port_info) = update_port();
-    if port_path == "Not found" {
-        let _ = app.emit("log_event", &format!("Port not available"));
-        return config;
-    }
-    let port_str = r"\\.\".to_owned() + &port_path;
-    let port_conn_str = r"--port=\\.\".to_owned() + &port_path;
-    let port_conn_str_linux = r"--port=".to_owned() + &port_path;
-    let current_exe = match env::current_exe() {
-        Ok(path) => path,
-        Err(_e) => return config,
-    };
-    let parent_dir: PathBuf = current_exe.parent().unwrap_or(Path::new(".")).to_path_buf();
-    let tools_dir = parent_dir.join("tools");
-    let fhloader_path = tools_dir.join("fh_loader.exe");
-    let sahara_server_path = tools_dir.join("QSaharaServer.exe");
-    let fhloader_path_linux = tools_dir.join("fh_loader");
-    let sahara_server_path_linux = tools_dir.join("QSaharaServer");
-    
-    config.current_dir = parent_dir;
-    config.fh_port_conn_str = port_conn_str;
-    config.sahara_port_conn_str = port_str;
-    config.fh_port_conn_str_linux = port_conn_str_linux;
-    config.fh_loader_path = fhloader_path.to_str().unwrap_or("fh_loader.exe").to_string();
-    config.sahara_server_path = sahara_server_path.to_str().unwrap_or("QSaharaServer.exe").to_string();
-    config.fh_loader_path_linux = fhloader_path_linux.to_str().unwrap_or("fh_loader").to_string();
-    config.sahara_server_path_linux = sahara_server_path_linux.to_str().unwrap_or("QSaharaServer").to_string();
-    config.is_connect = !config.fh_port_conn_str.is_empty();
-    return config;
-}
-
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 async fn erase_part(app: AppHandle, xml: &str) -> Result<(), Error> {
+    let config = command_util::Config::setup_env();
+    if config.is_connect == false {
+        let _ = app.emit("log_event", "port not available");
+        return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+    }
     let _ = app.emit("update_command_running_status", true);
     // Call the parsing function
-    let config = setup_env(&app);
     let items = xml_file_util::parser_erase_xml(xml);
     for (part, xml_content) in items {
         let file_name = "res/cmd.xml";
@@ -250,7 +146,7 @@ fn init(app: AppHandle) {
 
 #[tauri::command]
 async fn read_device_info(app: AppHandle) -> String {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
         return "Device not found".to_string();
     }
@@ -262,7 +158,7 @@ async fn read_device_info(app: AppHandle) -> String {
     #[cfg(target_os = "windows")] {
         let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", 
                    "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
-        let result = exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
+        let result = command_util::exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
         if result.starts_with("[Error]") == false {
             return file_util::analysis_info(&result);
         }
@@ -270,7 +166,7 @@ async fn read_device_info(app: AppHandle) -> String {
     #[cfg(target_os = "linux")] {
         let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", 
                    "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"];
-        let result = exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
+        let result = command_util::exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
         if result.starts_with("[Error]") == false {
             return file_util::analysis_info(&result);
         }
@@ -281,8 +177,9 @@ async fn read_device_info(app: AppHandle) -> String {
 
 #[tauri::command]
 async fn read_gpt(app: AppHandle) {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
+        let _ = app.emit("log_event", "port not available");
         return ();
     }
 
@@ -298,12 +195,12 @@ async fn read_gpt(app: AppHandle) {
         #[cfg(target_os = "windows")] {
             let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", 
                 "--sendxml=res/cmd.xml", "--convertprogram2read", "--mainoutputdir=img", "--skip_configure", "--showpercentagecomplete", "--noprompt"];
-            exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
+            command_util::exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
         }
         #[cfg(target_os = "linux")] {
             let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", 
                 "--sendxml=res/cmd.xml", "--convertprogram2read", "--mainoutputdir=img", "--zlpawarehost=1", "--showpercentagecomplete", "--noprompt"];
-            exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
+            command_util::exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
         }
         
         //parser gpt
@@ -337,9 +234,13 @@ async fn read_gpt(app: AppHandle) {
 
 #[tauri::command]
 fn read_part(app: AppHandle, xml: &str, folder: &str)  -> String {
-    let _ = app.emit("update_command_running_status", true);
     // Call the parsing function
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
+    if config.is_connect == false {
+        let _ = app.emit("log_event", "Device not found");
+        return "".to_string();
+    }
+    let _ = app.emit("update_command_running_status", true);
     let items = xml_file_util::parser_read_xml(xml);
     for (part, xml_content) in items {
         let file_name = "res/cmd.xml";
@@ -373,8 +274,9 @@ fn read_part(app: AppHandle, xml: &str, folder: &str)  -> String {
 
 #[tauri::command]
 fn reboot_to_edl(app: AppHandle) {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
+        let _ = app.emit("log_event", "port not available");
         return ();
     }
     let cmd = "<?xml version=\"1.0\" ?><data><power DelayInSeconds=\"0\" value=\"reset_to_edl\" /></data>";
@@ -394,8 +296,9 @@ fn reboot_to_edl(app: AppHandle) {
 
 #[tauri::command]
 fn reboot_to_fastboot(app: AppHandle, xml: &str) {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
+        let _ = app.emit("log_event", "port not available");
         return ();
     }
     // flash misc partition
@@ -428,8 +331,9 @@ fn reboot_to_fastboot(app: AppHandle, xml: &str) {
 
 #[tauri::command]
 fn reboot_to_recovery(app: AppHandle, xml: &str) {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
+        let _ = app.emit("log_event", "port not available");
         return ();
     }
     // flash misc partition
@@ -463,8 +367,9 @@ fn reboot_to_recovery(app: AppHandle, xml: &str) {
 
 #[tauri::command]
 fn reboot_to_system(app: AppHandle) {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
+        let _ = app.emit("log_event", "port not available");
         return ();
     }
     let cmd = "<?xml version=\"1.0\" ?><data><power DelayInSeconds=\"0\" value=\"reset\" /></data>";
@@ -493,8 +398,9 @@ fn save_to_xml(app: AppHandle, path: &str, xml: &str) {
 
 #[tauri::command]
 fn send_loader(app: AppHandle, loader: &str, digest: &str, sig: &str, native: bool)  -> String {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
+        let _ = app.emit("log_event", "port not available");
         return format!("port not available");
     }
     if native {
@@ -560,9 +466,9 @@ fn send_loader(app: AppHandle, loader: &str, digest: &str, sig: &str, native: bo
 
 #[tauri::command]
 async fn send_ping(app: AppHandle) {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
-        let _ = app.emit("log_event", "Device not found");
+        let _ = app.emit("log_event", "port not found");
         return;
     }
     let cmd = "<?xml version=\"1.0\" ?><data><nop verbose=\"0\" value=\"ping\"/></data>".to_string();
@@ -572,12 +478,12 @@ async fn send_ping(app: AppHandle) {
     #[cfg(target_os = "windows")] {
         let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", 
                    "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
-        result = exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
+        result = command_util::exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
     }
     #[cfg(target_os = "linux")] {
         let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", 
                    "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"];
-        result = exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
+        result = command_util::exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
     }
 }
 
@@ -690,8 +596,9 @@ fn stop_flashing(app: AppHandle, thread_state: State<Arc<Mutex<ThreadState>>>,) 
 
 #[tauri::command]
 async fn switch_slot(app: AppHandle, slot: &str) -> Result<String, Error> {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
+        let _ = app.emit("log_event", "Device not found");
         return Err(tauri::Error::AssetNotFound("Device not found".to_string()));
     }
     let _ = app.emit("update_command_running_status", true);
@@ -706,12 +613,12 @@ async fn switch_slot(app: AppHandle, slot: &str) -> Result<String, Error> {
     #[cfg(target_os = "windows")] {
         let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", 
                    "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
-        result = exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
+        result = command_util::exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
     }
     #[cfg(target_os = "linux")] {
         let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", 
                    "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"];
-        result = exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
+        result = command_util::exec_cmd(&app, &cmds, PathBuf::from(".").as_path()).await;
     }
     let _ = app.emit("update_command_running_status", false);
     return Ok(result);
@@ -743,8 +650,9 @@ fn update_port() -> (String, String) {
 
 #[tauri::command]
 fn write_from_xml(app: AppHandle, file_path:&str) -> String {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
+        let _ = app.emit("log_event", "port not found");
         return format!("Port not available");
     }
     let _ = app.emit("update_command_running_status", true);
@@ -788,8 +696,9 @@ fn write_from_xml(app: AppHandle, file_path:&str) -> String {
 
 #[tauri::command]
 fn write_part(app: AppHandle, xml: &str)  -> String {
-    let config = setup_env(&app);
+    let config = command_util::Config::setup_env();
     if config.is_connect == false {
+        let _ = app.emit("log_event", "port not found");
         return format!("port not available");
     }
     let _ = app.emit("update_command_running_status", true);
