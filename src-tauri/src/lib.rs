@@ -411,7 +411,7 @@ fn send_loader(app: AppHandle, loader: &str, digest: &str, sig: &str, native: bo
         };
         let _ = app.emit("log_event", &format!("Chip serial number: {}", client.get_chip_sn()));
         let _ = app.emit("log_event", &format!("OEM Private Key hash: {}", client.get_oem_key_hash()));
-        client.send_loader(loader);
+        //client.send_loader(loader);
     } else {
         let loader_str = r"13:".to_owned() + loader;
         let digest_str = r"--signeddigests=".to_owned() + digest;

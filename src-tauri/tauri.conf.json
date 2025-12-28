@@ -35,8 +35,12 @@
     "resources": [
       "tools/fh_loader.exe",
       "tools/QSaharaServer.exe",
+      "tools/lpmake.exe",
+      "tools/simg2img.exe",
       "tools/fh_loader",
       "tools/QSaharaServer",
+      "tools/lpmake",
+      "tools/simg2img",
       "res/cfg.xml",
       "res/sha256init.xml",
       "res/transfercfg.xml",
