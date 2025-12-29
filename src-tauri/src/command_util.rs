@@ -24,15 +24,17 @@ pub struct Config {
 
     pub fh_port_conn_str_linux: String,
 
+    pub sahara_port_conn_str_linux: String,
+
     pub current_dir: PathBuf,
 
     pub is_connect: bool,
 
-    log_level: LogLevel,
+    pub log_level: LogLevel,
 }
 
-#[derive(Debug, Clone, Copy)]
-enum LogLevel {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LogLevel {
     Info,
     Debug,
 }
@@ -48,6 +50,7 @@ impl Config {
             fh_port_conn_str: String::new(),
             sahara_port_conn_str: String::new(),
             fh_port_conn_str_linux: String::new(),
+            sahara_port_conn_str_linux: String::new(),
             current_dir: PathBuf::new(),
             is_connect: false,
             log_level: LogLevel::Info,
@@ -79,6 +82,7 @@ impl Config {
         config.fh_port_conn_str = port_conn_str;
         config.sahara_port_conn_str = port_str;
         config.fh_port_conn_str_linux = port_conn_str_linux;
+        config.sahara_port_conn_str_linux = port_path;
         config.fh_loader_path = fhloader_path.to_str().unwrap_or("fh_loader.exe").to_string();
         config.sahara_server_path = sahara_server_path.to_str().unwrap_or("QSaharaServer.exe").to_string();
         config.fh_loader_path_linux = fhloader_path_linux.to_str().unwrap_or("fh_loader").to_string();
@@ -112,11 +116,34 @@ fn update_port() -> (String, String) {
     }
 }
 
-pub async fn exec_cmd(app: &AppHandle, cmd: &[&str], current_dir:&Path) -> String {
+pub async fn exec_cmd_with_msg(msg: &str, app: &AppHandle, config: &Config, cmd: &[&str]) {
+    if config.log_level == LogLevel::Debug {
+        let mut cmd_str = format!("{} ", cmd[0]);
+        for (_index, s) in cmd.iter().enumerate() {
+            if _index != 0 {
+                cmd_str = format!("{} {}", cmd_str, s);
+            }
+        }
+        let _ = app.emit("log_event", &format!("{}", cmd_str));
+    }
+    
+    let result = exec_cmd(&app, &cmd, None).await;
+    if result.contains("[Error]") {
+        let _ = app.emit("log_event", &format!("{}...Error", msg));
+    } else {
+        let _ = app.emit("log_event", &format!("{}...OK", msg));
+    }
+}
+
+pub async fn exec_cmd(app: &AppHandle, cmd: &[&str], current_dir: Option<&Path>) -> String {
     if cmd.is_empty() {
         let _ = app.emit("log_event", "[Error]");
         return "[Error] cmd is empty".to_string();
     }
+    let work_dir = match current_dir {
+        Some(current_dir) => current_dir,
+        None => Path::new("."),
+    };
     let mut exe_cmd = Command::new(cmd[0]);
     #[cfg(target_os = "windows")]
     {
@@ -130,7 +157,7 @@ pub async fn exec_cmd(app: &AppHandle, cmd: &[&str], current_dir:&Path) -> Strin
         }
     }
     let _ = app.emit("log_event", &format!("{}", cmd_str));
-    let output = exe_cmd.current_dir(current_dir).output().await;
+    let output = exe_cmd.current_dir(&work_dir).output().await;
     
     let result = match output {
         Ok(output) => {

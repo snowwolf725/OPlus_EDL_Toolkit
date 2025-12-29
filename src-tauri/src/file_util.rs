@@ -296,13 +296,13 @@ pub fn check_necessary_files_in_edl_folder(path: &str, is_protect_lun5: bool) ->
 
         let img_folder = format!("{}/IMAGES", path);
         if check_folder_exist(&img_folder) {
-            let mut rawprogram_xml = String::new();
-            if is_protect_lun5 {
-                rawprogram_xml = format!("{}/rawprogram[0-4].xml", img_folder);
-            } else {
-                rawprogram_xml = format!("{}/rawprogram[0-5].xml", img_folder);
-            }
-            match get_matched_files_in_folder(&img_folder, &rawprogram_xml) {
+            match get_matched_files_in_folder(&img_folder, 
+                &if is_protect_lun5 {
+                    format!("{}/rawprogram[0-4].xml", img_folder)
+                } else {
+                    format!("{}/rawprogram[0-5].xml", img_folder)
+                }) 
+            {
                 Ok(files) => {
                     if files.is_empty() == false {
                         package.raw_program_files = files;
@@ -318,13 +318,13 @@ pub fn check_necessary_files_in_edl_folder(path: &str, is_protect_lun5: bool) ->
                 }
             }
 
-            let mut patch_xml = String::new();
-            if is_protect_lun5 {
-                patch_xml = format!("{}/patch[0-4].xml", img_folder);
-            } else {
-                patch_xml = format!("{}/patch[0-5].xml", img_folder);
-            }
-            match get_matched_files_in_folder(&img_folder, &patch_xml) {
+            match get_matched_files_in_folder(&img_folder, 
+                &if is_protect_lun5 {
+                    format!("{}/patch[0-4].xml", img_folder)
+                } else {
+                    format!("{}/patch[0-5].xml", img_folder)
+                }) 
+            {
                 Ok(files) => {
                     if files.is_empty() == false {
                         package.patch_files = files;

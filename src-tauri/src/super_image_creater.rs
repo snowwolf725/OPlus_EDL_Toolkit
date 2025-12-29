@@ -112,7 +112,7 @@ fn exec_cmd(cmd: &str, args: Vec<String>, current_dir:&Path) -> bool {
     println!("cmd: {}", cmd_str);
     let output = exe_cmd.current_dir(current_dir).output();
     
-    let _ = match output {
+    match output {
         Ok(output) => {
             if output.status.success() {
                 println!("{}",String::from_utf8_lossy(&output.stdout).to_string());
@@ -129,7 +129,6 @@ fn exec_cmd(cmd: &str, args: Vec<String>, current_dir:&Path) -> bool {
             return false;
         }
     };
-    return true;
 }
 
 struct EnvConfig {
@@ -225,5 +224,4 @@ pub fn creat_super_image(path: &str) -> bool {
          },
          Err(_e) => { return false; }
     }
-    return false;
 }

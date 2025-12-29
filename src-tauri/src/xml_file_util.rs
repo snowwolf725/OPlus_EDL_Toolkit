@@ -182,7 +182,7 @@ pub fn parser_program_xml_skip_empty(parent_dir: &str, content: &str) -> Vec<(St
     match from_str::<DataRoot>(&content) {
         Ok(data_root) => {
             // Iterate and print each program
-            for mut program in data_root.programs {
+            for program in data_root.programs {
                 if program.filename.trim().is_empty() {
                     continue;
                 }

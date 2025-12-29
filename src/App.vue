@@ -580,7 +580,6 @@
     }
 
     window.onload = function () {
-        invoke("init");
 
         document.getElementById('btn_selectLoaderFile').addEventListener('click', async () => {
             try {
