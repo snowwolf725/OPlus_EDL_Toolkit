@@ -1,11 +1,10 @@
 ﻿mod command_util;
-mod command_worker;
 mod file_util;
 mod firehose_service;
 mod gpt_parser;
 mod qdl;
-mod xml_file_util;
 mod super_image_creater;
+mod xml_file_util;
 
 use serialport::{available_ports, SerialPortType};
 use std::env;
@@ -14,6 +13,7 @@ use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
 use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Error, State};
+use tokio::runtime::Runtime;
 use crate::xml_file_util::DataRoot;
 
 struct ThreadState {
@@ -31,7 +31,7 @@ impl Default for ThreadState {
 }
 
 fn flash_patch_xml(state: &Arc<std::sync::Mutex<ThreadState>>, app: &AppHandle, 
-port_path: &str, folder: &str, files: Vec<String>) -> bool {
+   folder: &str, files: Vec<String>, config: &command_util::Config, runtime: &Runtime) -> bool {
     let total = files.len();
     let mut count = 0;
 
@@ -43,7 +43,8 @@ port_path: &str, folder: &str, files: Vec<String>) -> bool {
         count += 1;
         thread::sleep(Duration::from_secs(1));
 
-        if command_worker::flash_patch_xml(&port_path, &folder, &file) == false {
+        let result = runtime.block_on(firehose_service::flash_patch_xml(&app, &folder, &file, &config));
+        if result == false {
             let _ = app.emit("log_event", format!("Failed to flash patch: {}", &file));
             let _ = app.emit("stop_edl_flashing", "");
             return false;
@@ -56,8 +57,8 @@ port_path: &str, folder: &str, files: Vec<String>) -> bool {
     return true;
 }
 
-fn flash_program_xml(state: &Arc<std::sync::Mutex<ThreadState>>, app: &AppHandle, port_path: &str, 
-folder: &str, programs: Vec<(String, String)>) -> bool {
+fn flash_program_xml(state: &Arc<std::sync::Mutex<ThreadState>>, app: &AppHandle,
+folder: &str, programs: Vec<(String, String)>, config: &command_util::Config, runtime: &Runtime) -> bool {
     let total = programs.len();
     let mut count = 0;
     
@@ -69,7 +70,8 @@ folder: &str, programs: Vec<(String, String)>) -> bool {
         count += 1;
         thread::sleep(Duration::from_secs(1));
         
-        if command_worker::flash_part(&port_path, &folder, &program) == false {
+        let result = runtime.block_on(firehose_service::flash_part(&app, &label, &program, &folder, &config));
+        if result == false {
             let _ = app.emit("log_event", format!("Failed to flash partition: {}", label));
             let _ = app.emit("stop_edl_flashing", "");
             return false;
@@ -111,27 +113,12 @@ async fn read_device_info(app: AppHandle, is_debug: bool) -> String {
     }
 
     let _ = app.emit("update_command_running_status", true);
-    let cmd = "<?xml version=\"1.0\" ?><data><getstorageinfo physical_partition_number=\"0\" /></data>";
-    file_util::write_to_file("cmd.xml", "res", &cmd);
-    let _ = app.emit("log_event", &format!("Read Device Info..."));
-    #[cfg(target_os = "windows")] {
-        let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", 
-                   "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
-        let result = command_util::exec_cmd(&app, &cmds, None).await;
-        if result.starts_with("[Error]") == false {
-            return file_util::analysis_info(&result);
-        }
-    }
-    #[cfg(target_os = "linux")] {
-        let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", 
-                   "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"];
-        let result = command_util::exec_cmd(&app, &cmds, None).await;
-        if result.starts_with("[Error]") == false {
-            return file_util::analysis_info(&result);
-        }
-    }
+    let output = match firehose_service::read_storage_info(&app, &config).await {
+        Ok(result) => result,
+        Err(_e) => "".to_string(),
+    };
     let _ = app.emit("update_command_running_status", false);
-    return "".to_string();
+    return file_util::analysis_info(&output);
 }
 
 #[tauri::command]
@@ -145,22 +132,11 @@ async fn read_gpt(app: AppHandle, is_debug: bool) {
     let _ = app.emit("update_command_running_status", true);
     let mut root = DataRoot{programs: Vec::new(), read_tags: Vec::new(), erase_tags: Vec::new()};
     for i in 0..6 {
-        let _ = app.emit("log_event", format!("read LUN {}...", i));
         let read_tag = xml_file_util::create_read_tag_dynamic(&format!("gpt_main{}.bin", i), i, 0, 6, "PrimaryGPT");
 
         let read_xml = xml_file_util::to_xml(&read_tag);
         let xml_content = format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", read_xml);
-        file_util::write_to_file("cmd.xml", "res", &xml_content);
-        #[cfg(target_os = "windows")] {
-            let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", 
-                "--sendxml=res/cmd.xml", "--convertprogram2read", "--mainoutputdir=img", "--skip_configure", "--showpercentagecomplete", "--noprompt"];
-            command_util::exec_cmd(&app, &cmds, None).await;
-        }
-        #[cfg(target_os = "linux")] {
-            let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", 
-                "--sendxml=res/cmd.xml", "--convertprogram2read", "--mainoutputdir=img", "--zlpawarehost=1", "--showpercentagecomplete", "--noprompt"];
-            command_util::exec_cmd(&app, &cmds, None).await;
-        }
+        firehose_service::read_part(&app, &format!("LUN {}", i), &xml_content, "img", &config).await;
         
         //parser gpt
         let file_path = format!("img/gpt_main{}.bin", i).to_string();
@@ -303,23 +279,11 @@ async fn send_ping(app: AppHandle, is_debug: bool) {
         let _ = app.emit("log_event", "port not found");
         return;
     }
-    let cmd = "<?xml version=\"1.0\" ?><data><nop verbose=\"0\" value=\"ping\"/></data>".to_string();
-    file_util::write_to_file("cmd.xml", "res", &cmd);
-    let _ = app.emit("log_event", "Send Ping Command");
-    #[cfg(target_os = "windows")] {
-        let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", 
-                   "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
-        command_util::exec_cmd(&app, &cmds, None).await;
-    }
-    #[cfg(target_os = "linux")] {
-        let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", 
-                   "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"];
-        command_util::exec_cmd(&app, &cmds, None).await;
-    }
+    firehose_service::send_nop(&app, &config).await;
 }
 
 #[tauri::command] 
-fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, thread_state: State<Arc<Mutex<ThreadState>>>,) -> Result<(), String> {
+fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, is_debug: bool, thread_state: State<Arc<Mutex<ThreadState>>>) -> Result<(), String> {
     // lock thread state
     let mut state_guard = thread_state.lock().map_err(|e| format!("lock thread state faild: {}", e))?;
 
@@ -366,22 +330,29 @@ fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, thread_st
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
+                    let config = command_util::Config::setup_env(is_debug);
+                    if config.is_connect == false {
+                        let _ = app_clone.emit("log_event", "port not available");
+                        return;
+                    }
+                    let rt = Runtime::new().unwrap();
                     let (_file_name, dir_path) = file_util::parse_file_path("", &package.patch_files[0]);
-                    if flash_program_xml(&state_clone, &app_clone, &port_path, &dir_path, package.raw_programs) == false {
+                    if flash_program_xml(&state_clone, &app_clone, &dir_path, package.raw_programs, &config, &rt) == false {
                         let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
                         state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     let _ = app_clone.emit("update_percentage", 80);
-                    if flash_patch_xml(&state_clone, &app_clone, &port_path, &dir_path, package.patch_files) == false {
+                    if flash_patch_xml(&state_clone, &app_clone, &dir_path, package.patch_files, &config, &rt) == false {
                         let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
                         state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     let _ = app_clone.emit("update_percentage", 95);
-                    if command_worker::switch_slot(&port_path, "A") == false {
+                    let result = rt.block_on(firehose_service::switch_slot(&app_clone, "A", &config));
+                    if result == false {
                         let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
                         state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
@@ -433,23 +404,7 @@ async fn switch_slot(app: AppHandle, slot: &str, is_debug: bool) -> Result<(), E
         return Err(tauri::Error::AssetNotFound("Device not found".to_string()));
     }
     let _ = app.emit("update_command_running_status", true);
-    let cmd = if slot == "A" {
-        "<?xml version=\"1.0\" ?><data><setbootablestoragedrive value=\"1\" /></data>".to_string()
-    } else {
-        "<?xml version=\"1.0\" ?><data><setbootablestoragedrive value=\"2\" /></data>".to_string()
-    };
-    file_util::write_to_file("cmd.xml", "res", &cmd);
-    let _ = app.emit("log_event", &format!("Set slot to {}...", slot));
-    #[cfg(target_os = "windows")] {
-        let cmds = ["cmd", "/c", &config.fh_loader_path, &config.fh_port_conn_str, "--memoryname=ufs", 
-                   "--sendxml=res/cmd.xml", "--noprompt", "--skip_configure", "--mainoutputdir=res"];
-        command_util::exec_cmd(&app, &cmds, None).await;
-    }
-    #[cfg(target_os = "linux")] {
-        let cmds = [&config.fh_loader_path_linux, &config.fh_port_conn_str_linux, "--memoryname=ufs", 
-                   "--sendxml=res/cmd.xml", "--noprompt", "--zlpawarehost=1", "--mainoutputdir=res"];
-        command_util::exec_cmd(&app, &cmds, None).await;
-    }
+    firehose_service::switch_slot(&app, &slot, &config).await;
     let _ = app.emit("update_command_running_status", false);
     return Ok(());
 }
@@ -497,7 +452,7 @@ async fn write_from_xml(app: AppHandle, file_path:&str, is_debug: bool) -> Resul
         if config.is_connect == false {
             return Err(tauri::Error::AssetNotFound("port not available".to_string()));
         }
-        firehose_service::write_part(&app, &part, &xml_content, &dir_path, &config).await;
+        firehose_service::flash_part(&app, &part, &xml_content, &dir_path, &config).await;
     }
     let _ = app.emit("update_command_running_status", false);
     Ok(())
@@ -513,7 +468,7 @@ async fn write_part(app: AppHandle, xml: &str, is_debug: bool) -> Result<(), Err
     let _ = app.emit("update_command_running_status", true);
     let items = xml_file_util::parser_program_xml("", xml);
     for (part, xml_content, dir_path) in items {
-        firehose_service::write_part(&app, &part, &xml_content, &dir_path, &config).await;
+        firehose_service::flash_part(&app, &part, &xml_content, &dir_path, &config).await;
     }
     let _ = app.emit("update_command_running_status", false);
     Ok(())

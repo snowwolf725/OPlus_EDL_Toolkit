@@ -485,7 +485,7 @@
     async function startFlashing() {
         isRunning.value = true;
         const edlFolder = document.getElementById('edlFolderPathDisplay').value;
-        await invoke("start_flashing", { path: edlFolder, isProtectLun5: isProtectLun5.value });
+        await invoke("start_flashing", { path: edlFolder, isProtectLun5: isProtectLun5.value, isDebug: isDebug.value });
     }
 
     async function stopFlashing() {
@@ -862,8 +862,8 @@
                         </div>
                         <div class="radio-group">
                             <label>{{ t('setting.logLevel') }}</label>
-                            <label><input type="radio" name="log" value="false" v-model="isDebug" checked> Info</label>
-                            <label><input type="radio" name="log" value="true" v-model="isDebug"> Debug</label>
+                            <label><input type="radio" name="log" :value="false" v-model="isDebug" checked> Info</label>
+                            <label><input type="radio" name="log" :value="true" v-model="isDebug"> Debug</label>
                         </div>
                     </div>
                 </div>

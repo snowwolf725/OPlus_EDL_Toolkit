@@ -116,28 +116,27 @@ fn update_port() -> (String, String) {
     }
 }
 
-pub async fn exec_cmd_with_msg(msg: &str, app: &AppHandle, config: &Config, cmd: &[&str]) {
+pub async fn exec_cmd_with_msg(msg: &str, app: &AppHandle, config: &Config, cmd: &[&str]) -> Result<String, String> {
     if config.log_level == LogLevel::Debug {
-        let mut cmd_str = format!("{} ", cmd[0]);
+        let mut cmd_str = String::new();
         for (_index, s) in cmd.iter().enumerate() {
-            if _index != 0 {
-                cmd_str = format!("{} {}", cmd_str, s);
-            }
+            cmd_str = format!("{} {}", &cmd_str, s);
         }
-        let _ = app.emit("log_event", &format!("{}", cmd_str));
+        let _ = app.emit("log_event", &format!("{}", &cmd_str));
     }
     
-    let result = exec_cmd(&app, &cmd, None).await;
+    let result = exec_cmd(&cmd, None).await;
     if result.contains("[Error]") {
         let _ = app.emit("log_event", &format!("{}...Error", msg));
+        Err(result)
     } else {
         let _ = app.emit("log_event", &format!("{}...OK", msg));
+        Ok(result)
     }
 }
 
-pub async fn exec_cmd(app: &AppHandle, cmd: &[&str], current_dir: Option<&Path>) -> String {
+async fn exec_cmd(cmd: &[&str], current_dir: Option<&Path>) -> String {
     if cmd.is_empty() {
-        let _ = app.emit("log_event", "[Error]");
         return "[Error] cmd is empty".to_string();
     }
     let work_dir = match current_dir {
@@ -149,31 +148,25 @@ pub async fn exec_cmd(app: &AppHandle, cmd: &[&str], current_dir: Option<&Path>)
     {
       exe_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW constant
     }
-    let mut cmd_str = format!("{} ", cmd[0]);
     for (_index, s) in cmd.iter().enumerate() {
         if _index != 0 {
             exe_cmd.arg(s);
-            cmd_str = format!("{} {}", cmd_str, s);
         }
     }
-    let _ = app.emit("log_event", &format!("{}", cmd_str));
     let output = exe_cmd.current_dir(&work_dir).output().await;
     
     let result = match output {
         Ok(output) => {
             if output.status.success() {
-                let _ = app.emit("log_event", "[OK]");
                 println!("{}",String::from_utf8_lossy(&output.stdout).to_string());
                 String::from_utf8_lossy(&output.stdout).to_string()
             } else {
-                let _ = app.emit("log_event", "[Error]");
                 let err_msg = String::from_utf8_lossy(&output.stderr).to_string();
                 println!("[Error]: {}", err_msg);
                 format!("[Error]: {}", err_msg)
             }
         }
         Err(e) => {
-            let _ = app.emit("log_event", "[Error]");
             let err_msg = format!("Execution failed: {}", e);
             println!("[Error]: {}", err_msg);
             format!("[Error]: {}", err_msg)
