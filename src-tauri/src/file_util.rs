@@ -2,8 +2,9 @@
 use glob::glob;
 use regex::Regex;
 use std::fmt;
-use std::io;
+use std::io::{self, Read};
 use std::fs;
+use std::fs::File;
 use std::fs::metadata;
 use std::path::Path;
 
@@ -383,4 +384,52 @@ pub fn check_necessary_files_in_edl_folder(path: &str, is_protect_lun5: bool) ->
         return Err(CheckFileError::DirectoryNotFound)
     }
     Ok(package)
+}
+
+pub fn identify_loader<P: AsRef<Path>>(file_path: P) -> String {
+    let mut buffer = Vec::new();
+    match File::open(file_path) {
+        Ok(mut file) => {
+            let _ = file.read_to_end(&mut buffer);
+        },
+        Err(_e) => {},
+    }
+    
+    
+    // Search binary pattern: "51 43 4F 4D 00"  b"QCOM\x00"
+    let search_pattern = b"QCOM\x00";
+    let mut result = String::new();
+    let mut i = 0;
+    
+    // Search pattern in file
+    while i + search_pattern.len() <= buffer.len() {
+        if &buffer[i..i + search_pattern.len()] == search_pattern {
+            let start_index = i + search_pattern.len();
+            let mut end_index = start_index;
+            
+            // find 0x00
+            while end_index < buffer.len() && buffer[end_index] != 0x00 {
+                end_index += 1;
+            }
+            
+            if end_index > start_index {
+                let extracted = &buffer[start_index..end_index];
+                if extracted.is_empty() == false {
+                    for &byte in extracted {
+                        if byte.is_ascii_graphic() || byte == b' ' {
+                            result.push(byte as char);
+                        } else {
+                            result.push('.');
+                        }
+                    }
+                }
+            }
+            
+            break;
+        } else {
+            i += 1;
+        }
+    }
+    
+    return result;
 }

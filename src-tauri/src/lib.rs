@@ -7,6 +7,7 @@ mod super_image_creater;
 mod xml_file_util;
 
 use serialport::{available_ports, SerialPortType};
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
@@ -103,6 +104,30 @@ async fn erase_part(app: AppHandle, xml: &str, is_debug: bool) -> Result<(), Err
     }
     let _ = app.emit("update_command_running_status", false);
     Ok(())
+}
+
+#[tauri::command]
+async fn identify_loader(app: AppHandle, path: String) {
+    let mut map = HashMap::new();
+    map.insert("SM4250", "Snapdragon 460");
+    map.insert("SM4350", "Snapdragon 480");
+    map.insert("SM6375", "Snapdragon 695");
+    map.insert("SM7475", "Snapdragon 7+ Gen 2");
+    map.insert("SM7675", "Snapdragon 7+ Gen 3");
+    map.insert("SM8350", "Snapdragon 888");
+    map.insert("SM8450", "Snapdragon 8 Gen 1");
+    map.insert("SM8475", "Snapdragon 8+ Gen 1");
+    map.insert("SM8550", "Snapdragon 8 Gen 2");
+    map.insert("SM8650", "Snapdragon 8 Gen 3");
+    map.insert("SM8750", "Snapdragon 8 Elite");
+
+    let result =  file_util::identify_loader(path);
+    if let Some(model) = map.get(result.as_str()) {
+        let _ = app.emit("log_event", format!("Select EDL Loader: {} ({})", result, model));
+    } else {
+        let _ = app.emit("log_event", format!("Select EDL Loader: {} (Unknown)", result));
+    }
+    
 }
 
 #[tauri::command]
@@ -246,7 +271,7 @@ fn save_to_xml(app: AppHandle, path: &str, xml: &str) {
 }
 
 #[tauri::command]
-async fn send_loader(app: AppHandle, loader: String, digest: String, sig: String, native: bool, is_debug: bool)  -> String {
+async fn send_loader(app: AppHandle, loader: String, digest: String, sig: String, native: bool, is_debug: bool) -> String {
     let config = command_util::Config::setup_env(is_debug);
     if config.is_connect == false {
         let _ = app.emit("log_event", "port not available");
@@ -481,7 +506,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Arc::new(Mutex::new(ThreadState::default())))
-        .invoke_handler(tauri::generate_handler![erase_part, read_device_info, read_gpt, read_part, 
+        .invoke_handler(tauri::generate_handler![erase_part, identify_loader, read_device_info, read_gpt, read_part, 
         reboot_to_edl, reboot_to_fastboot, reboot_to_recovery, reboot_to_system, 
         save_to_xml, send_ping, send_loader, start_flashing, stop_flashing, switch_slot, update_port, write_from_xml, write_part])
         .run(tauri::generate_context!())

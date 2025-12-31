@@ -589,6 +589,7 @@
                 });
                 if (file) {
                     document.getElementById('loaderPathDisplay').value = file;
+                    await invoke("identify_loader", { path: file });
                 }
             } catch (error) {
                 console.error('Error occurred while selecting a file:', error);
