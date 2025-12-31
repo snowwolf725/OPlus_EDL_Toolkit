@@ -17,7 +17,7 @@
     const percentage = ref(0);
     const imgSavingPath = ref("img/");
     const isEnablePing = ref(true);
-    const isCommandRunning = false;
+    let isCommandRunning = false;
     let isSentLoader = false;
     let name = ref("");
     let portStatus = ref("EDL device not found");

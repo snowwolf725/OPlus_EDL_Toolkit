@@ -1,4 +1,5 @@
 ﻿mod command_util;
+mod edl_loader_util;
 mod file_util;
 mod firehose_service;
 mod gpt_parser;
@@ -7,7 +8,6 @@ mod super_image_creater;
 mod xml_file_util;
 
 use serialport::{available_ports, SerialPortType};
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
@@ -108,26 +108,21 @@ async fn erase_part(app: AppHandle, xml: &str, is_debug: bool) -> Result<(), Err
 
 #[tauri::command]
 async fn identify_loader(app: AppHandle, path: String) {
-    let mut map = HashMap::new();
-    map.insert("SM4250", "Snapdragon 460");
-    map.insert("SM4350", "Snapdragon 480");
-    map.insert("SM6375", "Snapdragon 695");
-    map.insert("SM7475", "Snapdragon 7+ Gen 2");
-    map.insert("SM7675", "Snapdragon 7+ Gen 3");
-    map.insert("SM8350", "Snapdragon 888");
-    map.insert("SM8450", "Snapdragon 8 Gen 1");
-    map.insert("SM8475", "Snapdragon 8+ Gen 1");
-    map.insert("SM8550", "Snapdragon 8 Gen 2");
-    map.insert("SM8650", "Snapdragon 8 Gen 3");
-    map.insert("SM8750", "Snapdragon 8 Elite");
+    let result =  edl_loader_util::identify_loader(&path);
+    let _ = app.emit("log_event", format!("Select EDL Loader: {}", result));
 
-    let result =  file_util::identify_loader(path);
-    if let Some(model) = map.get(result.as_str()) {
-        let _ = app.emit("log_event", format!("Select EDL Loader: {} ({})", result, model));
-    } else {
-        let _ = app.emit("log_event", format!("Select EDL Loader: {} (Unknown)", result));
+    match edl_loader_util::parser_key_hash(&path) {
+        Ok(results) => {
+            let mut count = 0;
+            for hash in &results {
+                count += 1;
+                let _ = app.emit("log_event", format!("CA {} SHA384: {}", count, hash));
+            }
+        },
+        Err(_e) => {},
     }
     
+
 }
 
 #[tauri::command]
