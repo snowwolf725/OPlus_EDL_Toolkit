@@ -6,12 +6,12 @@ use std::fmt::Write;
 
 // Define struct for the root <data> node in XML
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename = "data")]  // Match the root node name in XML
+#[serde(rename = "data")] // Match the root node name in XML
 pub struct DataRoot {
     // Match multiple <program> child nodes under <data>
     #[serde(rename = "program", default)]
     pub programs: Vec<Program>,
-    
+
     // Match multiple <read> child nodes under <data>
     #[serde(rename = "read", default)]
     pub read_tags: Vec<ReadTag>,
@@ -65,7 +65,6 @@ pub struct EraseTag {
     pub start_sector: u64,
     #[serde(rename = "@num_partition_sectors")]
     pub num_partition_sectors: u64,
-    
 }
 
 // Define struct for the <read> node (matches all attributes)
@@ -97,12 +96,11 @@ where
     serializer.serialize_str(&size_str)
 }
 
-
 pub fn create_program_dynamic(
     lun: u8,
     start_sector: u64,
     num_partition_sectors: u64,
-    label: &str
+    label: &str,
 ) -> Program {
     let size_in_kb = num_partition_sectors as f64 * 4.0;
     let sector_size = 4096;
@@ -130,7 +128,7 @@ pub fn create_read_tag_dynamic(
     lun: u8,
     start_sector: u64,
     num_partition_sectors: u64,
-    label: &str
+    label: &str,
 ) -> ReadTag {
     ReadTag {
         filename: filename.to_string(),
@@ -155,17 +153,21 @@ pub fn parser_program_xml(parent_dir: &str, content: &str) -> Vec<(String, Strin
             }
             // Iterate and print each program
             for mut program in data_root.programs {
-               let (file_name, dir_path) = file_util::parse_file_path(&parent_dir, &program.filename);
-               println!("Test {}, {}, {}", &program.filename, &file_name, &dir_path);
-               program.filename = file_name;
-               let program_xml = match to_string(&program) {
+                let (file_name, dir_path) =
+                    file_util::parse_file_path(&parent_dir, &program.filename);
+                println!("Test {}, {}, {}", &program.filename, &file_name, &dir_path);
+                program.filename = file_name;
+                let program_xml = match to_string(&program) {
                     Ok(xml) => xml,
                     Err(_e) => {
                         continue;
                     }
-               };
-               let xml_content = format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", program_xml);
-               result.push((program.label, xml_content, dir_path));
+                };
+                let xml_content = format!(
+                    "<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n",
+                    program_xml
+                );
+                result.push((program.label, xml_content, dir_path));
             }
         }
         Err(e) => {
@@ -176,7 +178,10 @@ pub fn parser_program_xml(parent_dir: &str, content: &str) -> Vec<(String, Strin
     return result;
 }
 
-pub fn parser_program_xml_skip_empty(parent_dir: &str, content: &str) -> Vec<(String, String, String)> {
+pub fn parser_program_xml_skip_empty(
+    parent_dir: &str,
+    content: &str,
+) -> Vec<(String, String, String)> {
     let mut result = Vec::<(String, String, String)>::new();
     // Call the parsing function
     match from_str::<DataRoot>(&content) {
@@ -186,7 +191,8 @@ pub fn parser_program_xml_skip_empty(parent_dir: &str, content: &str) -> Vec<(St
                 if program.filename.trim().is_empty() {
                     continue;
                 }
-                let (file_name, _dir_path) = file_util::parse_file_path(&parent_dir, &program.filename);
+                let (file_name, _dir_path) =
+                    file_util::parse_file_path(&parent_dir, &program.filename);
 
                 let program_xml = match to_string(&program) {
                     Ok(xml) => xml,
@@ -194,7 +200,10 @@ pub fn parser_program_xml_skip_empty(parent_dir: &str, content: &str) -> Vec<(St
                         continue;
                     }
                 };
-                let xml_content = format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", program_xml);
+                let xml_content = format!(
+                    "<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n",
+                    program_xml
+                );
                 result.push((program.label, file_name, xml_content));
             }
         }
@@ -218,14 +227,15 @@ pub fn parser_erase_xml(content: &str) -> Vec<(String, String)> {
             }
             // Iterate and print each tag
             for tag in data_root.erase_tags {
-               let erase_xml = match to_string(&tag) {
+                let erase_xml = match to_string(&tag) {
                     Ok(xml) => xml,
                     Err(_e) => {
                         continue;
                     }
                 };
-               let xml_content = format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", erase_xml);
-               result.push((tag.label, xml_content));
+                let xml_content =
+                    format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", erase_xml);
+                result.push((tag.label, xml_content));
             }
         }
         Err(e) => {
@@ -235,7 +245,6 @@ pub fn parser_erase_xml(content: &str) -> Vec<(String, String)> {
     }
     return result;
 }
-
 
 pub fn parser_read_xml(content: &str) -> Vec<(String, String)> {
     let mut result = Vec::<(String, String)>::new();
@@ -249,14 +258,15 @@ pub fn parser_read_xml(content: &str) -> Vec<(String, String)> {
             }
             // Iterate and print each read
             for read in data_root.read_tags {
-               let read_xml = match to_string(&read) {
+                let read_xml = match to_string(&read) {
                     Ok(xml) => xml,
                     Err(_e) => {
                         continue;
                     }
                 };
-               let xml_content = format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", read_xml);
-               result.push((read.label, xml_content));
+                let xml_content =
+                    format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", read_xml);
+                result.push((read.label, xml_content));
             }
         }
         Err(e) => {
@@ -270,9 +280,7 @@ pub fn parser_read_xml(content: &str) -> Vec<(String, String)> {
 pub fn to_xml<T: serde::Serialize>(tag: &T) -> String {
     let read_xml = match to_string(&tag) {
         Ok(xml) => xml,
-        Err(_e) => {
-            "".to_string()
-        }
+        Err(_e) => "".to_string(),
     };
     return read_xml;
 }

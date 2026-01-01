@@ -7,9 +7,9 @@ use std::{
     str::FromStr,
 };
 
+use crate::qdl::firehose::firehose_reset;
 use anyhow::{Error, bail};
 use owo_colors::OwoColorize;
-use crate::qdl::firehose::firehose_reset;
 
 /// Common respones indicating success/failure respectively
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -234,5 +234,3 @@ impl Display for FirehoseResetMode {
         }
     }
 }
-
-

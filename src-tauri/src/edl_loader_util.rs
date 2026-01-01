@@ -1,22 +1,25 @@
-use std::collections::HashSet;
+use ring::digest::{self, Digest, SHA384};
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Result};
 use std::path::Path;
 use x509_parser::parse_x509_certificate;
 use x509_parser::prelude::X509Certificate;
-use ring::digest::{self, SHA384, Digest};
 
 fn compute_sha384(data: &[u8]) -> String {
     let digest: Digest = digest::digest(&SHA384, data);
-    digest.as_ref().iter()
+    digest
+        .as_ref()
+        .iter()
         .map(|b| format!("{:02x}", b))
         .collect()
 }
 
 /// Condition: 1. basicConstraints CA=true  2. issuer = subject
 fn is_root_ca_cert(cert: &X509Certificate) -> bool {
-    let has_ca_constraint = cert.basic_constraints()
+    let has_ca_constraint = cert
+        .basic_constraints()
         .map(|bc| bc.unwrap().value.ca)
         .unwrap_or(false);
 
@@ -82,27 +85,26 @@ pub fn identify_loader<P: AsRef<Path>>(file_path: P) -> String {
     match File::open(file_path) {
         Ok(mut file) => {
             let _ = file.read_to_end(&mut buffer);
-        },
-        Err(_e) => {},
+        }
+        Err(_e) => {}
     }
-    
-    
+
     // Search binary pattern: "51 43 4F 4D 00"  b"QCOM\x00"
     let search_pattern = b"QCOM\x00";
     let mut result = String::new();
     let mut i = 0;
-    
+
     // Search pattern in file
     while i + search_pattern.len() <= buffer.len() {
         if &buffer[i..i + search_pattern.len()] == search_pattern {
             let start_index = i + search_pattern.len();
             let mut end_index = start_index;
-            
+
             // find 0x00
             while end_index < buffer.len() && buffer[end_index] != 0x00 {
                 end_index += 1;
             }
-            
+
             if end_index > start_index {
                 let extracted = &buffer[start_index..end_index];
                 if extracted.is_empty() == false {
@@ -115,13 +117,13 @@ pub fn identify_loader<P: AsRef<Path>>(file_path: P) -> String {
                     }
                 }
             }
-            
+
             break;
         } else {
             i += 1;
         }
     }
-    
+
     let mut map = HashMap::new();
     map.insert("SM4250", "Snapdragon 460");
     map.insert("SM4350", "Snapdragon 480");

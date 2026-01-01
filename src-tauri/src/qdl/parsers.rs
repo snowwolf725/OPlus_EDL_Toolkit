@@ -6,9 +6,9 @@ use indexmap::IndexMap;
 use anyhow::bail;
 use owo_colors::OwoColorize;
 
-use crate::qdl::types::{ FirehoseResetMode, FirehoseStatus, QdlChan };
+use crate::qdl::types::{FirehoseResetMode, FirehoseStatus, QdlChan};
 
-use crate::qdl::firehose::{firehose_configure, firehose_read, firehose_reset };
+use crate::qdl::firehose::{firehose_configure, firehose_read, firehose_reset};
 
 /// The highest protocol version currently supported by the library
 #[allow(dead_code)]

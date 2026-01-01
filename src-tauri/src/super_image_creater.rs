@@ -4,8 +4,8 @@ use std::env;
 use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
-use thiserror::Error;
 use std::process::Command;
+use thiserror::Error;
 
 // ======================== 1. Custom Error Type (Optional, improves error handling) ========================
 #[derive(Error, Debug)]
@@ -76,10 +76,10 @@ pub struct Partition {
 
 // ======================== 3. Core Function: Read JSON and Parse to Struct ========================
 /// Reads a JSON file from the specified path and parses it into a PartitionConfig struct
-/// 
+///
 /// # Arguments
 /// * `path` - Path to the JSON configuration file (e.g., "partition_config.json")
-/// 
+///
 /// # Returns
 /// * `Ok(PartitionConfig)` - Successfully parsed configuration
 /// * `Err(JsonParseError)` - Failed to open file or parse JSON
@@ -94,15 +94,15 @@ pub fn read_partition_config<P: AsRef<Path>>(path: P) -> Result<PartitionConfig,
     Ok(config)
 }
 
-fn exec_cmd(cmd: &str, args: Vec<String>, current_dir:&Path) -> bool {
+fn exec_cmd(cmd: &str, args: Vec<String>, current_dir: &Path) -> bool {
     if cmd.is_empty() {
         return false;
     }
     let mut exe_cmd = Command::new(cmd);
     #[cfg(target_os = "windows")]
     {
-      use std::os::windows::process::CommandExt;
-      exe_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW constant
+        use std::os::windows::process::CommandExt;
+        exe_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW constant
     }
     let mut cmd_str = format!("{} ", cmd);
     for (_index, s) in args.iter().enumerate() {
@@ -111,11 +111,11 @@ fn exec_cmd(cmd: &str, args: Vec<String>, current_dir:&Path) -> bool {
     }
     println!("cmd: {}", cmd_str);
     let output = exe_cmd.current_dir(current_dir).output();
-    
+
     match output {
         Ok(output) => {
             if output.status.success() {
-                println!("{}",String::from_utf8_lossy(&output.stdout).to_string());
+                println!("{}", String::from_utf8_lossy(&output.stdout).to_string());
                 return true;
             } else {
                 let err_msg = String::from_utf8_lossy(&output.stderr).to_string();
@@ -159,12 +159,18 @@ fn get_runtime_env(path: &str) -> EnvConfig {
     let simg2img_path_linux = tools_dir.join("simg2img");
 
     let (_file_name, dir_path) = file_util::parse_file_path("", &path);
-    let work_dir = PathBuf::from(dir_path).parent().unwrap_or(Path::new(".")).to_path_buf();
+    let work_dir = PathBuf::from(dir_path)
+        .parent()
+        .unwrap_or(Path::new("."))
+        .to_path_buf();
 
     config.lpmake_path = lpmake_path.to_str().unwrap_or("lpmake.exe").to_string();
     config.lpmake_path_linux = lpmake_path_linux.to_str().unwrap_or("lpmake").to_string();
     config.simg2img_path = simg2img_path.to_str().unwrap_or("simg2img.exe").to_string();
-    config.simg2img_path_linux = simg2img_path_linux.to_str().unwrap_or("simg2img").to_string();
+    config.simg2img_path_linux = simg2img_path_linux
+        .to_str()
+        .unwrap_or("simg2img")
+        .to_string();
     config.work_dir = work_dir;
     return config;
 }
@@ -172,56 +178,67 @@ fn get_runtime_env(path: &str) -> EnvConfig {
 pub fn creat_super_image(path: &str) -> bool {
     let define_path = Path::new(path);
     match read_partition_config(define_path) {
-         Ok(config) => {
-             if config.block_devices.len() > 0 && config.groups.len() > 0 {
-                 let env_config = get_runtime_env(&path);
-                 let mut args = Vec::<String>::new();
-                 args.push(format!("/c"));
-                 args.push(env_config.lpmake_path);
-                 args.push(format!("--device-size={}", config.block_devices[0].size));
-                 args.push(format!("--metadata-size={}", config.super_meta.size));
-                 args.push(format!("--metadata-slots={}", config.groups.len()));
-                 args.push(format!("--super-name={}", config.block_devices[0].name));
-                 args.push(format!("--virtual-ab"));
-                 args.push(format!("-block-size={}", config.block_devices[0].block_size));
-                 args.push(format!("--sparse"));
-                 
-                 for group in config.groups {
-                     if group.maximum_size.is_empty() == false {
-                         args.push(format!("--group={}:{}", group.name, group.maximum_size));
-                     }
-                 }
+        Ok(config) => {
+            if config.block_devices.len() > 0 && config.groups.len() > 0 {
+                let env_config = get_runtime_env(&path);
+                let mut args = Vec::<String>::new();
+                args.push(format!("/c"));
+                args.push(env_config.lpmake_path);
+                args.push(format!("--device-size={}", config.block_devices[0].size));
+                args.push(format!("--metadata-size={}", config.super_meta.size));
+                args.push(format!("--metadata-slots={}", config.groups.len()));
+                args.push(format!("--super-name={}", config.block_devices[0].name));
+                args.push(format!("--virtual-ab"));
+                args.push(format!(
+                    "-block-size={}",
+                    config.block_devices[0].block_size
+                ));
+                args.push(format!("--sparse"));
 
-                 for partition in config.partitions {
-                     if partition.size.is_empty() {
-                         args.push(format!("--partition"));
-                         args.push(format!("{}:none:0:{}", partition.name, partition.group_name));
-                     } else {
-                         let mut simg_args = Vec::<String>::new();
-                         simg_args.push(format!("/c"));
-                         simg_args.push(format!("{}", env_config.simg2img_path));
-                         simg_args.push(partition.path.clone());
-                         simg_args.push(format!("{}.raw", &partition.path));
+                for group in config.groups {
+                    if group.maximum_size.is_empty() == false {
+                        args.push(format!("--group={}:{}", group.name, group.maximum_size));
+                    }
+                }
 
-                         args.push(format!("--partition"));
-                         args.push(format!("{}:readonly:{}:{}", partition.name, partition.size, partition.group_name));
-                         args.push(format!("--image"));
-                         if exec_cmd("cmd", simg_args, env_config.work_dir.as_path()) {
-                             args.push(format!("{}={}.raw", partition.name, &partition.path));
-                         } else {
-                             args.push(format!("{}={}", partition.name, &partition.path));
-                         }
-                     }
-                 }
-                 args.push(format!("-F"));
-                 args.push(format!("--output"));
-                 args.push(format!("IMAGES/super.img"));
+                for partition in config.partitions {
+                    if partition.size.is_empty() {
+                        args.push(format!("--partition"));
+                        args.push(format!(
+                            "{}:none:0:{}",
+                            partition.name, partition.group_name
+                        ));
+                    } else {
+                        let mut simg_args = Vec::<String>::new();
+                        simg_args.push(format!("/c"));
+                        simg_args.push(format!("{}", env_config.simg2img_path));
+                        simg_args.push(partition.path.clone());
+                        simg_args.push(format!("{}.raw", &partition.path));
 
-                 return exec_cmd("cmd", args, env_config.work_dir.as_path());
-             } else {
-                 return false;
-             }
-         },
-         Err(_e) => { return false; }
+                        args.push(format!("--partition"));
+                        args.push(format!(
+                            "{}:readonly:{}:{}",
+                            partition.name, partition.size, partition.group_name
+                        ));
+                        args.push(format!("--image"));
+                        if exec_cmd("cmd", simg_args, env_config.work_dir.as_path()) {
+                            args.push(format!("{}={}.raw", partition.name, &partition.path));
+                        } else {
+                            args.push(format!("{}={}", partition.name, &partition.path));
+                        }
+                    }
+                }
+                args.push(format!("-F"));
+                args.push(format!("--output"));
+                args.push(format!("IMAGES/super.img"));
+
+                return exec_cmd("cmd", args, env_config.work_dir.as_path());
+            } else {
+                return false;
+            }
+        }
+        Err(_e) => {
+            return false;
+        }
     }
 }

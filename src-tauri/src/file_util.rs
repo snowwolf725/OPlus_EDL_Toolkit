@@ -1,19 +1,19 @@
-﻿use crate::xml_file_util;
+use crate::xml_file_util;
 use glob::glob;
 use regex::Regex;
 use std::fmt;
-use std::io;
 use std::fs;
 use std::fs::metadata;
+use std::io;
 use std::path::Path;
 
 /// Custom error type (simplified error handling)
 #[derive(Debug)]
 pub enum CheckFileError {
-    InvalidPath,          // Invalid folder path
-    DirectoryNotFound,    // Folder does not exist
-    GlobError(glob::PatternError), // Wildcard pattern parsing error
-    GlobIterError(glob::GlobError),       // Glob iteration error
+    InvalidPath,                    // Invalid folder path
+    DirectoryNotFound,              // Folder does not exist
+    GlobError(glob::PatternError),  // Wildcard pattern parsing error
+    GlobIterError(glob::GlobError), // Glob iteration error
 }
 
 pub struct EdlPackage {
@@ -50,7 +50,7 @@ pub fn check_file_exist(file_path: &str) -> bool {
 
 pub fn check_folder_exist(path_str: &str) -> bool {
     let path = Path::new(path_str);
-    
+
     match path.try_exists() {
         Ok(exists) => exists,
         Err(_) => false,
@@ -77,7 +77,6 @@ pub fn write_to_file(path: &str, output_dir: &str, content: &str) {
         println!("write file success:{}", file_name);
     }
 }
-
 
 pub fn read_text_file(file_path: &str) -> Result<String, String> {
     // Convert string path to Path object for validation
@@ -106,19 +105,19 @@ pub fn read_text_file(file_path: &str) -> Result<String, String> {
                     format!("File not found: '{}'", file_path)
                 }
                 std::io::ErrorKind::InvalidData => {
-                    format!("Invalid text encoding: File '{}' is not a valid text file", file_path)
+                    format!(
+                        "Invalid text encoding: File '{}' is not a valid text file",
+                        file_path
+                    )
                 }
-                _ => format!(
-                    "Failed to read file '{}': {}",
-                    file_path, e
-                ),
+                _ => format!("Failed to read file '{}': {}", file_path, e),
             };
             Err(error_msg)
         }
     }
 }
 
-pub fn parse_file_path(parent_dir:&str, path: &str) -> (String, String) {
+pub fn parse_file_path(parent_dir: &str, path: &str) -> (String, String) {
     // Convert the input string to a Path object for path manipulation
     let mut full_path = Path::new(path);
     let mut file_path = path.to_string();
@@ -141,7 +140,8 @@ pub fn parse_file_path(parent_dir:&str, path: &str) -> (String, String) {
         .ok_or_else(|| format!("Failed to extract file name from path '{}'", file_path)) // Return error string
         .and_then(|os_str| {
             // Convert OsStr to &str, return error if invalid Unicode
-            os_str.to_str()
+            os_str
+                .to_str()
                 .ok_or_else(|| format!("Path '{}' contains invalid Unicode characters", file_path))
         })
         .unwrap() // Panic on error (simple error handling for this example)
@@ -150,11 +150,20 @@ pub fn parse_file_path(parent_dir:&str, path: &str) -> (String, String) {
     // 2. Extract the parent directory of the file with error handling
     let directory = full_path
         .parent()
-        .ok_or_else(|| format!("Failed to extract directory from path '{}' (may be root directory)", file_path))
+        .ok_or_else(|| {
+            format!(
+                "Failed to extract directory from path '{}' (may be root directory)",
+                file_path
+            )
+        })
         .and_then(|path| {
             // Convert Path to &str, return error if invalid Unicode
-            path.to_str()
-                .ok_or_else(|| format!("Directory path '{}' contains invalid Unicode characters", file_path))
+            path.to_str().ok_or_else(|| {
+                format!(
+                    "Directory path '{}' contains invalid Unicode characters",
+                    file_path
+                )
+            })
         })
         .unwrap() // Panic on error (simple error handling for this example)
         .to_string();
@@ -170,7 +179,10 @@ pub fn analysis_info(input: &str) -> String {
             if let Some(hex_match) = re.find(line) {
                 let hex_str = hex_match.as_str();
                 match u64::from_str_radix(&hex_str[2..], 16) {
-                    Ok(decimal) => { output = format!("{}\n Device Total Physical Partitions:{}", output, decimal);},
+                    Ok(decimal) => {
+                        output =
+                            format!("{}\n Device Total Physical Partitions:{}", output, decimal);
+                    }
                     Err(e) => eprintln!("Convert Failed: {}", e),
                 }
             }
@@ -190,30 +202,29 @@ pub fn analysis_info(input: &str) -> String {
                 let hex_str = hex_match.as_str();
                 match u64::from_str_radix(&hex_str[2..], 16) {
                     Ok(decimal) => {
-                        let slot = if decimal == 1 {
-                            "A"
-                        } else {
-                            "B"
-                        };
+                        let slot = if decimal == 1 { "A" } else { "B" };
                         output = format!("{}\n Active slot:{}", output, slot);
-                    },
+                    }
                     Err(e) => eprintln!("Convert Failed: {}", e),
                 }
             }
-        } 
+        }
     });
     return output;
 }
 
 /// Check all files matching pattern in the specified folder and return their paths
-/// 
+///
 /// # Parameters
 /// - `dir_path`: Folder path (absolute/relative path)
 /// - `pattern`: file glob pattern
-/// 
+///
 /// # Returns
 /// - `Result<Vec<String>, CheckFileError>`: Ok(Vec<String>) contains all matched file paths, Error if exception occurs
-fn get_matched_files_in_folder(dir_path: &str, glob_pattern: &str) -> Result<Vec<String>, CheckFileError> {
+fn get_matched_files_in_folder(
+    dir_path: &str,
+    glob_pattern: &str,
+) -> Result<Vec<String>, CheckFileError> {
     // 1. Validate the target directory's existence and type
     let dir = Path::new(dir_path);
     if !dir.exists() {
@@ -227,8 +238,7 @@ fn get_matched_files_in_folder(dir_path: &str, glob_pattern: &str) -> Result<Vec
     let mut matched_files = Vec::new();
 
     // 3. Parse the glob pattern and get an iterator of matched entries
-    let entries = glob(glob_pattern)
-        .map_err(|e| CheckFileError::GlobError(e))?;
+    let entries = glob(glob_pattern).map_err(|e| CheckFileError::GlobError(e))?;
 
     // 4. Iterate over all matched entries, filter files, and collect their paths
     for entry in entries {
@@ -244,7 +254,9 @@ fn get_matched_files_in_folder(dir_path: &str, glob_pattern: &str) -> Result<Vec
                         }
                         None => {
                             // Skip files with non-UTF-8 paths and log a warning
-                            eprintln!("Warning: Found a file with non-UTF-8 encoded path, skipped.");
+                            eprintln!(
+                                "Warning: Found a file with non-UTF-8 encoded path, skipped."
+                            );
                         }
                     }
                 }
@@ -260,15 +272,18 @@ fn get_matched_files_in_folder(dir_path: &str, glob_pattern: &str) -> Result<Vec
     Ok(matched_files)
 }
 
-pub fn check_necessary_files_in_edl_folder(path: &str, is_protect_lun5: bool) -> Result<EdlPackage, CheckFileError> {
+pub fn check_necessary_files_in_edl_folder(
+    path: &str,
+    is_protect_lun5: bool,
+) -> Result<EdlPackage, CheckFileError> {
     let mut package = EdlPackage {
         is_miss_file: false,
         is_miss_super_image: false,
         super_define: "".to_string(),
         raw_program_files: Vec::<String>::new(),
         raw_programs: Vec::<(String, String)>::new(),
-        patch_files: Vec::<String>::new()
-        };
+        patch_files: Vec::<String>::new(),
+    };
     if check_folder_exist(&path) {
         // 1. check necessary json and xml file
         let meta_folder = format!("{}/META", path);
@@ -280,68 +295,76 @@ pub fn check_necessary_files_in_edl_folder(path: &str, is_protect_lun5: bool) ->
                         package.super_define = format!("{}", files.last().unwrap());
                         println!("✅ Folder {} contains super_def.*.json files", &meta_folder);
                     } else {
-                        println!("❌ No super_def.*.json files found in folder {}", &meta_folder);
-                        return Err(CheckFileError::InvalidPath)
+                        println!(
+                            "❌ No super_def.*.json files found in folder {}",
+                            &meta_folder
+                        );
+                        return Err(CheckFileError::InvalidPath);
                     }
                 }
                 Err(e) => {
                     eprintln!("❌ Check failed: {}", e);
-                    return Err(CheckFileError::InvalidPath)
+                    return Err(CheckFileError::InvalidPath);
                 }
             }
         } else {
             eprintln!("Folder not found:{}", &meta_folder);
-            return Err(CheckFileError::DirectoryNotFound)
+            return Err(CheckFileError::DirectoryNotFound);
         }
 
         let img_folder = format!("{}/IMAGES", path);
         if check_folder_exist(&img_folder) {
-            match get_matched_files_in_folder(&img_folder, 
+            match get_matched_files_in_folder(
+                &img_folder,
                 &if is_protect_lun5 {
                     format!("{}/rawprogram[0-4].xml", img_folder)
                 } else {
                     format!("{}/rawprogram[0-5].xml", img_folder)
-                }) 
-            {
+                },
+            ) {
                 Ok(files) => {
                     if files.is_empty() == false {
                         package.raw_program_files = files;
                         println!("✅ Folder {} contains rawprogram?.xml files", &img_folder);
                     } else {
-                        println!("❌ No rawprogram?.xml files found in folder {}", &img_folder);
-                        return Err(CheckFileError::InvalidPath)
+                        println!(
+                            "❌ No rawprogram?.xml files found in folder {}",
+                            &img_folder
+                        );
+                        return Err(CheckFileError::InvalidPath);
                     }
                 }
                 Err(e) => {
                     eprintln!("❌ Check failed: {}", e);
-                    return Err(CheckFileError::InvalidPath)
+                    return Err(CheckFileError::InvalidPath);
                 }
             }
 
-            match get_matched_files_in_folder(&img_folder, 
+            match get_matched_files_in_folder(
+                &img_folder,
                 &if is_protect_lun5 {
                     format!("{}/patch[0-4].xml", img_folder)
                 } else {
                     format!("{}/patch[0-5].xml", img_folder)
-                }) 
-            {
+                },
+            ) {
                 Ok(files) => {
                     if files.is_empty() == false {
                         package.patch_files = files;
                         println!("✅ Folder {} contains patch?.xml files", &img_folder);
                     } else {
                         println!("❌ No patch?.xml files found in folder {}", &img_folder);
-                        return Err(CheckFileError::InvalidPath)
+                        return Err(CheckFileError::InvalidPath);
                     }
                 }
                 Err(e) => {
                     eprintln!("❌ Check failed: {}", e);
-                    return Err(CheckFileError::InvalidPath)
+                    return Err(CheckFileError::InvalidPath);
                 }
             }
         } else {
             eprintln!("Folder not found:{}", &img_folder);
-            return Err(CheckFileError::DirectoryNotFound)
+            return Err(CheckFileError::DirectoryNotFound);
         }
 
         // 2. parser img name in rawprogram.xml
@@ -366,22 +389,22 @@ pub fn check_necessary_files_in_edl_folder(path: &str, is_protect_lun5: bool) ->
                             } else if skip_list.contains(&label) == false {
                                 println!("Label:{}, {}", label, file_name);
                                 package.is_miss_file = true;
-                                return Err(CheckFileError::InvalidPath)
+                                return Err(CheckFileError::InvalidPath);
                             }
                         } else {
-                            if skip_list.contains(&label) == false { // skip import partition
+                            if skip_list.contains(&label) == false {
+                                // skip import partition
                                 package.raw_programs.push((label, xml_content));
                             }
                         }
                     }
-                },
-                Err(_e) => {return Err(CheckFileError::InvalidPath)}
+                }
+                Err(_e) => return Err(CheckFileError::InvalidPath),
             }
         }
     } else {
         eprintln!("Folder not found:{}", &path);
-        return Err(CheckFileError::DirectoryNotFound)
+        return Err(CheckFileError::DirectoryNotFound);
     }
     Ok(package)
 }
-

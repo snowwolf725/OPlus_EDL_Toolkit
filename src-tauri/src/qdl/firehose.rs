@@ -9,8 +9,10 @@ use std::io::{Read, Write};
 use std::str::{self, FromStr};
 use xmltree::{Element, XMLNode};
 
-use crate::qdl::types::{QdlChan, FirehoseResetMode, FirehoseStatus, FirehoseStorageType, QdlBackend};
 use crate::qdl::parsers::firehose_parser_ack_nak;
+use crate::qdl::types::{
+    FirehoseResetMode, FirehoseStatus, FirehoseStorageType, QdlBackend, QdlChan,
+};
 
 /// Reboot or power off the Device
 pub fn firehose_reset<T: QdlChan>(
@@ -35,7 +37,6 @@ pub fn firehose_reset<T: QdlChan>(
 
     firehose_write_getack(channel, &mut xml, "reset the Device".to_owned())
 }
-
 
 /// Wrapper for easily creating Firehose-y XML packets
 fn firehose_xml_setup(op: &str, kvps: &[(&str, &str)]) -> anyhow::Result<Vec<u8>> {
@@ -257,7 +258,6 @@ pub fn firehose_configure<T: QdlChan>(
     firehose_write(channel, &mut xml)
 }
 
-
 /// Test performance without sample data
 #[allow(dead_code)]
 pub fn firehose_benchmark<T: QdlChan>(
@@ -282,7 +282,6 @@ pub fn firehose_benchmark<T: QdlChan>(
 
     firehose_write_getack(channel, &mut xml, "issue a NOP".to_owned())
 }
-
 
 /// Do nothing, hopefully succesfully
 #[allow(dead_code)]

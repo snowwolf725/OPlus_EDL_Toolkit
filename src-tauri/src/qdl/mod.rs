@@ -1,20 +1,20 @@
-pub mod types;
-pub mod parsers;
-pub mod serial;
 pub mod firehose;
+pub mod parsers;
 pub mod sahara;
-use itertools::Itertools;
-use types::QdlDevice;
-use std::fs;
-use std::io;
-use crate::qdl::serial::setup_serial_device;
-use crate::qdl::types::FirehoseConfiguration;
-use crate::qdl::firehose::{firehose_read, firehose_configure};
+pub mod serial;
+pub mod types;
+use crate::qdl::firehose::{firehose_configure, firehose_read};
 use crate::qdl::parsers::{firehose_parser_ack_nak, firehose_parser_configure_response};
-use crate::qdl::serial::QdlSerialConfig;
+use crate::qdl::sahara::SaharaCmdModeCmd;
 use crate::qdl::sahara::SaharaMode;
 use crate::qdl::sahara::sahara_run;
-use crate::qdl::sahara::SaharaCmdModeCmd;
+use crate::qdl::serial::QdlSerialConfig;
+use crate::qdl::serial::setup_serial_device;
+use crate::qdl::types::FirehoseConfiguration;
+use itertools::Itertools;
+use std::fs;
+use std::io;
+use types::QdlDevice;
 
 pub struct SaharaClient {
     chip_sn: String,
@@ -57,7 +57,8 @@ impl SaharaClient {
             &mut [],
             vec![],
             true,
-        ).unwrap();
+        )
+        .unwrap();
         println!(
             "OEM Private Key hash: 0x{:02x}",
             key_hash[..key_hash.len() / 3].iter().format("")
@@ -71,11 +72,11 @@ impl SaharaClient {
     }
 
     pub fn get_chip_sn(&self) -> String {
-        return  self.chip_sn.clone();
+        return self.chip_sn.clone();
     }
 
     pub fn get_oem_key_hash(&self) -> String {
-        return  self.oem_key_hash.clone();
+        return self.oem_key_hash.clone();
     }
 
     pub fn send_loader(&mut self, loader_path: &str) {
@@ -93,7 +94,7 @@ impl SaharaClient {
                     vec![],
                     true,
                 );
-                
+
                 // If we're past Sahara, activate the Firehose reset-on-drop listener
                 //self.channel.reset_on_drop = true;
 
@@ -110,8 +111,5 @@ impl SaharaClient {
                 eprintln!("Couldn't open the programmer binary: {}", e);
             }
         };
-
-        
     }
 }
-

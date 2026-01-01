@@ -4,6 +4,7 @@
     import { invoke } from "@tauri-apps/api/core";
     import { listen } from "@tauri-apps/api/event";
     import { open, save } from "@tauri-apps/plugin-dialog";
+    import { locale as systemLocale } from "@tauri-apps/plugin-os";
     import { readTextFile, writeTextFile, BaseDirectory } from '@tauri-apps/plugin-fs';
     import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
@@ -24,7 +25,7 @@
     let portName = ref("N/A");
     let portNum = ref("");
     let isDebug = ref(false);
-    const selectedLang = ref('en');
+    let selectedLang = ref('en');
 
     const { t, locale, availableLocales } = useI18n();
 
@@ -579,8 +580,12 @@
         await invoke("write_part", { xml: xmlContent, isDebug: isDebug.value });
     }
 
-    window.onload = function () {
-
+    window.onload = async function () {
+        const systemlocale = await systemLocale();
+        if (systemlocale) {
+            selectedLang.value = systemlocale.replace('-', '_');
+            handleSelectLangChange();
+        }
         document.getElementById('btn_selectLoaderFile').addEventListener('click', async () => {
             try {
                 const file = await open({

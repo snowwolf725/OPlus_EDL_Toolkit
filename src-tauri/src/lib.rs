@@ -1,4 +1,4 @@
-﻿mod command_util;
+mod command_util;
 mod edl_loader_util;
 mod file_util;
 mod firehose_service;
@@ -7,15 +7,18 @@ mod qdl;
 mod super_image_creater;
 mod xml_file_util;
 
-use serialport::{available_ports, SerialPortType};
+use crate::xml_file_util::DataRoot;
+use serialport::{SerialPortType, available_ports};
 use std::env;
 use std::fs;
-use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Error, State};
 use tokio::runtime::Runtime;
-use crate::xml_file_util::DataRoot;
 
 struct ThreadState {
     running: AtomicBool,
@@ -31,8 +34,14 @@ impl Default for ThreadState {
     }
 }
 
-fn flash_patch_xml(state: &Arc<std::sync::Mutex<ThreadState>>, app: &AppHandle, 
-   folder: &str, files: Vec<String>, config: &command_util::Config, runtime: &Runtime) -> bool {
+fn flash_patch_xml(
+    state: &Arc<std::sync::Mutex<ThreadState>>,
+    app: &AppHandle,
+    folder: &str,
+    files: Vec<String>,
+    config: &command_util::Config,
+    runtime: &Runtime,
+) -> bool {
     let total = files.len();
     let mut count = 0;
 
@@ -44,25 +53,33 @@ fn flash_patch_xml(state: &Arc<std::sync::Mutex<ThreadState>>, app: &AppHandle,
         count += 1;
         thread::sleep(Duration::from_secs(1));
 
-        let result = runtime.block_on(firehose_service::flash_patch_xml(&app, &folder, &file, &config));
+        let result = runtime.block_on(firehose_service::flash_patch_xml(
+            &app, &folder, &file, &config,
+        ));
         if result == false {
             let _ = app.emit("log_event", format!("Failed to flash patch: {}", &file));
             let _ = app.emit("stop_edl_flashing", "");
             return false;
         } else {
-            println!("Flash patch:{} / {}", (count * 15)/total, total);
+            println!("Flash patch:{} / {}", (count * 15) / total, total);
             let _ = app.emit("log_event", format!("Flash patch file: {}", &file));
-            let _ = app.emit("update_percentage", 80 + (count * 15)/total);
+            let _ = app.emit("update_percentage", 80 + (count * 15) / total);
         }
     }
     return true;
 }
 
-fn flash_program_xml(state: &Arc<std::sync::Mutex<ThreadState>>, app: &AppHandle,
-folder: &str, programs: Vec<(String, String)>, config: &command_util::Config, runtime: &Runtime) -> bool {
+fn flash_program_xml(
+    state: &Arc<std::sync::Mutex<ThreadState>>,
+    app: &AppHandle,
+    folder: &str,
+    programs: Vec<(String, String)>,
+    config: &command_util::Config,
+    runtime: &Runtime,
+) -> bool {
     let total = programs.len();
     let mut count = 0;
-    
+
     for (label, program) in programs {
         if state.lock().unwrap().running.load(Ordering::SeqCst) == false {
             let _ = app.emit("log_event", "Operation canceled by user");
@@ -70,16 +87,18 @@ folder: &str, programs: Vec<(String, String)>, config: &command_util::Config, ru
         }
         count += 1;
         thread::sleep(Duration::from_secs(1));
-        
-        let result = runtime.block_on(firehose_service::flash_part(&app, &label, &program, &folder, &config));
+
+        let result = runtime.block_on(firehose_service::flash_part(
+            &app, &label, &program, &folder, &config,
+        ));
         if result == false {
             let _ = app.emit("log_event", format!("Failed to flash partition: {}", label));
             let _ = app.emit("stop_edl_flashing", "");
             return false;
         } else {
-            println!("Flash program:{} / {}", (count * 60)/total, total);
+            println!("Flash program:{} / {}", (count * 60) / total, total);
             let _ = app.emit("log_event", format!("Flash partition: {}", label));
-            let _ = app.emit("update_percentage", 20 + (count * 60)/total);
+            let _ = app.emit("update_percentage", 20 + (count * 60) / total);
         }
     }
     return true;
@@ -91,14 +110,18 @@ async fn erase_part(app: AppHandle, xml: &str, is_debug: bool) -> Result<(), Err
     let config = command_util::Config::setup_env(is_debug);
     if config.is_connect == false {
         let _ = app.emit("log_event", "port not available");
-        return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+        return Err(tauri::Error::AssetNotFound(
+            "port not available".to_string(),
+        ));
     }
     let _ = app.emit("update_command_running_status", true);
     // Call the parsing function
     let items = xml_file_util::parser_erase_xml(xml);
     for (part, xml_content) in items {
         if config.is_connect == false {
-            return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+            return Err(tauri::Error::AssetNotFound(
+                "port not available".to_string(),
+            ));
         }
         firehose_service::erase_part(&app, &part, &xml_content, &config).await;
     }
@@ -108,7 +131,7 @@ async fn erase_part(app: AppHandle, xml: &str, is_debug: bool) -> Result<(), Err
 
 #[tauri::command]
 async fn identify_loader(app: AppHandle, path: String) {
-    let result =  edl_loader_util::identify_loader(&path);
+    let result = edl_loader_util::identify_loader(&path);
     let _ = app.emit("log_event", format!("Select EDL Loader: {}", result));
 
     match edl_loader_util::parser_key_hash(&path) {
@@ -118,11 +141,9 @@ async fn identify_loader(app: AppHandle, path: String) {
                 count += 1;
                 let _ = app.emit("log_event", format!("CA {} SHA384: {}", count, hash));
             }
-        },
-        Err(_e) => {},
+        }
+        Err(_e) => {}
     }
-    
-
 }
 
 #[tauri::command]
@@ -150,14 +171,25 @@ async fn read_gpt(app: AppHandle, is_debug: bool) {
     }
 
     let _ = app.emit("update_command_running_status", true);
-    let mut root = DataRoot{programs: Vec::new(), read_tags: Vec::new(), erase_tags: Vec::new()};
+    let mut root = DataRoot {
+        programs: Vec::new(),
+        read_tags: Vec::new(),
+        erase_tags: Vec::new(),
+    };
     for i in 0..6 {
-        let read_tag = xml_file_util::create_read_tag_dynamic(&format!("gpt_main{}.bin", i), i, 0, 6, "PrimaryGPT");
+        let read_tag = xml_file_util::create_read_tag_dynamic(
+            &format!("gpt_main{}.bin", i),
+            i,
+            0,
+            6,
+            "PrimaryGPT",
+        );
 
         let read_xml = xml_file_util::to_xml(&read_tag);
         let xml_content = format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", read_xml);
-        firehose_service::read_part(&app, &format!("LUN {}", i), &xml_content, "img", &config).await;
-        
+        firehose_service::read_part(&app, &format!("LUN {}", i), &xml_content, "img", &config)
+            .await;
+
         //parser gpt
         let file_path = format!("img/gpt_main{}.bin", i).to_string();
         let mut parser = gpt_parser::GptParser::new();
@@ -168,16 +200,16 @@ async fn read_gpt(app: AppHandle, is_debug: bool) {
             match parser.parse_file(file_path, 4096) {
                 Ok(_) => {
                     for (_i, partition) in parser.partitions().iter().enumerate() {
-                        let program = xml_file_util::create_program_dynamic(i, 
-                            partition.first_lba, 
-                            partition.size_in_sectors(), 
-                            &partition.name);
+                        let program = xml_file_util::create_program_dynamic(
+                            i,
+                            partition.first_lba,
+                            partition.size_in_sectors(),
+                            &partition.name,
+                        );
                         root.programs.push(program);
                     }
                 }
-                Err(_e) => {
-
-                }
+                Err(_e) => {}
             }
         }
     }
@@ -193,13 +225,17 @@ async fn read_part(app: AppHandle, xml: &str, folder: &str, is_debug: bool) -> R
     let config = command_util::Config::setup_env(is_debug);
     if config.is_connect == false {
         let _ = app.emit("log_event", "Device not found");
-        return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+        return Err(tauri::Error::AssetNotFound(
+            "port not available".to_string(),
+        ));
     }
     let _ = app.emit("update_command_running_status", true);
     let items = xml_file_util::parser_read_xml(xml);
     for (part, xml_content) in items {
         if config.is_connect == false {
-            return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+            return Err(tauri::Error::AssetNotFound(
+                "port not available".to_string(),
+            ));
         }
 
         firehose_service::read_part(&app, &part, &xml_content, &folder, &config).await;
@@ -224,7 +260,9 @@ async fn reboot_to_fastboot(app: AppHandle, xml: &str, is_debug: bool) -> Result
     let config = command_util::Config::setup_env(is_debug);
     if config.is_connect == false {
         let _ = app.emit("log_event", "port not available");
-        return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+        return Err(tauri::Error::AssetNotFound(
+            "port not available".to_string(),
+        ));
     }
     firehose_service::reboot_to(&app, "Reboot to fastbootD", &xml, &config).await;
     let _ = app.emit("update_loader_status", false);
@@ -236,7 +274,9 @@ async fn reboot_to_recovery(app: AppHandle, xml: &str, is_debug: bool) -> Result
     let config = command_util::Config::setup_env(is_debug);
     if config.is_connect == false {
         let _ = app.emit("log_event", "port not available");
-        return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+        return Err(tauri::Error::AssetNotFound(
+            "port not available".to_string(),
+        ));
     }
     firehose_service::reboot_to(&app, "Reboot to recovery", &xml, &config).await;
     let _ = app.emit("update_loader_status", false);
@@ -266,7 +306,14 @@ fn save_to_xml(app: AppHandle, path: &str, xml: &str) {
 }
 
 #[tauri::command]
-async fn send_loader(app: AppHandle, loader: String, digest: String, sig: String, native: bool, is_debug: bool) -> String {
+async fn send_loader(
+    app: AppHandle,
+    loader: String,
+    digest: String,
+    sig: String,
+    native: bool,
+    is_debug: bool,
+) -> String {
     let config = command_util::Config::setup_env(is_debug);
     if config.is_connect == false {
         let _ = app.emit("log_event", "port not available");
@@ -278,8 +325,14 @@ async fn send_loader(app: AppHandle, loader: String, digest: String, sig: String
             Ok(client) => client,
             Err(_e) => return format!("Sahara connect error: {}", _e),
         };
-        let _ = app.emit("log_event", &format!("Chip serial number: {}", client.get_chip_sn()));
-        let _ = app.emit("log_event", &format!("OEM Private Key hash: {}", client.get_oem_key_hash()));
+        let _ = app.emit(
+            "log_event",
+            &format!("Chip serial number: {}", client.get_chip_sn()),
+        );
+        let _ = app.emit(
+            "log_event",
+            &format!("OEM Private Key hash: {}", client.get_oem_key_hash()),
+        );
         client.send_loader(&loader);
     } else {
         let loader_str = r"13:".to_owned() + &loader;
@@ -302,10 +355,18 @@ async fn send_ping(app: AppHandle, is_debug: bool) {
     firehose_service::send_nop(&app, &config).await;
 }
 
-#[tauri::command] 
-fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, is_debug: bool, thread_state: State<Arc<Mutex<ThreadState>>>) -> Result<(), String> {
+#[tauri::command]
+fn start_flashing(
+    app: AppHandle,
+    path: String,
+    is_protect_lun5: bool,
+    is_debug: bool,
+    thread_state: State<Arc<Mutex<ThreadState>>>,
+) -> Result<(), String> {
     // lock thread state
-    let mut state_guard = thread_state.lock().map_err(|e| format!("lock thread state faild: {}", e))?;
+    let mut state_guard = thread_state
+        .lock()
+        .map_err(|e| format!("lock thread state faild: {}", e))?;
 
     // if running then return
     if state_guard.running.load(Ordering::SeqCst) {
@@ -331,14 +392,20 @@ fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, is_debug:
                     if super_image_creater::creat_super_image(&package.super_define) == false {
                         let _ = app_clone.emit("stop_edl_flashing", "");
                         let _ = app_clone.emit("log_event", "Failed to create Super image.");
-                        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
-                        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
+                        let _ =
+                            app_clone.emit("log_event", "The flashing operation has been stopped");
+                        state_clone
+                            .lock()
+                            .unwrap()
+                            .running
+                            .store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     if state_clone.lock().unwrap().running.load(Ordering::SeqCst) == false {
                         let _ = app_clone.emit("log_event", "Operation canceled by user");
-                        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
+                        let _ =
+                            app_clone.emit("log_event", "The flashing operation has been stopped");
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
@@ -356,25 +423,58 @@ fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, is_debug:
                         return;
                     }
                     let rt = Runtime::new().unwrap();
-                    let (_file_name, dir_path) = file_util::parse_file_path("", &package.patch_files[0]);
-                    if flash_program_xml(&state_clone, &app_clone, &dir_path, package.raw_programs, &config, &rt) == false {
-                        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
-                        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
+                    let (_file_name, dir_path) =
+                        file_util::parse_file_path("", &package.patch_files[0]);
+                    if flash_program_xml(
+                        &state_clone,
+                        &app_clone,
+                        &dir_path,
+                        package.raw_programs,
+                        &config,
+                        &rt,
+                    ) == false
+                    {
+                        let _ =
+                            app_clone.emit("log_event", "The flashing operation has been stopped");
+                        state_clone
+                            .lock()
+                            .unwrap()
+                            .running
+                            .store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     let _ = app_clone.emit("update_percentage", 80);
-                    if flash_patch_xml(&state_clone, &app_clone, &dir_path, package.patch_files, &config, &rt) == false {
-                        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
-                        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
+                    if flash_patch_xml(
+                        &state_clone,
+                        &app_clone,
+                        &dir_path,
+                        package.patch_files,
+                        &config,
+                        &rt,
+                    ) == false
+                    {
+                        let _ =
+                            app_clone.emit("log_event", "The flashing operation has been stopped");
+                        state_clone
+                            .lock()
+                            .unwrap()
+                            .running
+                            .store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     let _ = app_clone.emit("update_percentage", 95);
-                    let result = rt.block_on(firehose_service::switch_slot(&app_clone, "A", &config));
+                    let result =
+                        rt.block_on(firehose_service::switch_slot(&app_clone, "A", &config));
                     if result == false {
-                        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
-                        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
+                        let _ =
+                            app_clone.emit("log_event", "The flashing operation has been stopped");
+                        state_clone
+                            .lock()
+                            .unwrap()
+                            .running
+                            .store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
@@ -383,13 +483,17 @@ fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, is_debug:
                 } else {
                     let _ = app_clone.emit("log_event", &format!("Check necessary files...Error"));
                 }
-            },
+            }
             Err(_e) => {
                 let _ = app_clone.emit("log_event", &format!("Check necessary files...Error"));
             }
         }
 
-        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
+        state_clone
+            .lock()
+            .unwrap()
+            .running
+            .store(false, Ordering::SeqCst);
         let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
     });
 
@@ -399,9 +503,14 @@ fn start_flashing(app: AppHandle, path: String, is_protect_lun5: bool, is_debug:
 }
 
 #[tauri::command]
-fn stop_flashing(app: AppHandle, thread_state: State<Arc<Mutex<ThreadState>>>,) -> Result<(), String> {
+fn stop_flashing(
+    app: AppHandle,
+    thread_state: State<Arc<Mutex<ThreadState>>>,
+) -> Result<(), String> {
     // lock thread state
-    let state_guard = thread_state.lock().map_err(|e| format!("lock thread state faild: {}", e))?;
+    let state_guard = thread_state
+        .lock()
+        .map_err(|e| format!("lock thread state faild: {}", e))?;
 
     // if not running then return
     if state_guard.running.load(Ordering::SeqCst) == false {
@@ -436,14 +545,14 @@ fn update_port() -> (String, String) {
     let mut product = String::new();
     for p in ports {
         match p.port_type {
-             SerialPortType::UsbPort(info) => {
+            SerialPortType::UsbPort(info) => {
                 port = p.port_name;
                 if let Some(pinfo) = info.product {
                     println!("product : {}", pinfo);
                     product = pinfo;
                 }
-             },
-             SerialPortType::PciPort | SerialPortType::BluetoothPort | SerialPortType::Unknown => {}
+            }
+            SerialPortType::PciPort | SerialPortType::BluetoothPort | SerialPortType::Unknown => {}
         }
     }
     if port.is_empty() {
@@ -454,11 +563,13 @@ fn update_port() -> (String, String) {
 }
 
 #[tauri::command]
-async fn write_from_xml(app: AppHandle, file_path:&str, is_debug: bool) -> Result<(), Error> {
+async fn write_from_xml(app: AppHandle, file_path: &str, is_debug: bool) -> Result<(), Error> {
     let config = command_util::Config::setup_env(is_debug);
     if config.is_connect == false {
         let _ = app.emit("log_event", "port not found");
-        return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+        return Err(tauri::Error::AssetNotFound(
+            "port not available".to_string(),
+        ));
     }
     let _ = app.emit("update_command_running_status", true);
     let xml = match file_util::read_text_file(file_path) {
@@ -466,11 +577,13 @@ async fn write_from_xml(app: AppHandle, file_path:&str, is_debug: bool) -> Resul
         Err(e) => format!("Error reading file: {}", e),
     };
     let (_file_name, dir_path) = file_util::parse_file_path("", file_path);
-    
+
     let items = xml_file_util::parser_program_xml(&dir_path, &xml);
     for (part, xml_content, _dir_path) in items {
         if config.is_connect == false {
-            return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+            return Err(tauri::Error::AssetNotFound(
+                "port not available".to_string(),
+            ));
         }
         firehose_service::flash_part(&app, &part, &xml_content, &dir_path, &config).await;
     }
@@ -483,7 +596,9 @@ async fn write_part(app: AppHandle, xml: &str, is_debug: bool) -> Result<(), Err
     let config = command_util::Config::setup_env(is_debug);
     if config.is_connect == false {
         let _ = app.emit("log_event", "port not found");
-        return Err(tauri::Error::AssetNotFound("port not available".to_string()));
+        return Err(tauri::Error::AssetNotFound(
+            "port not available".to_string(),
+        ));
     }
     let _ = app.emit("update_command_running_status", true);
     let items = xml_file_util::parser_program_xml("", xml);
@@ -497,13 +612,31 @@ async fn write_part(app: AppHandle, xml: &str, is_debug: bool) -> Result<(), Err
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Arc::new(Mutex::new(ThreadState::default())))
-        .invoke_handler(tauri::generate_handler![erase_part, identify_loader, read_device_info, read_gpt, read_part, 
-        reboot_to_edl, reboot_to_fastboot, reboot_to_recovery, reboot_to_system, 
-        save_to_xml, send_ping, send_loader, start_flashing, stop_flashing, switch_slot, update_port, write_from_xml, write_part])
+        .invoke_handler(tauri::generate_handler![
+            erase_part,
+            identify_loader,
+            read_device_info,
+            read_gpt,
+            read_part,
+            reboot_to_edl,
+            reboot_to_fastboot,
+            reboot_to_recovery,
+            reboot_to_system,
+            save_to_xml,
+            send_ping,
+            send_loader,
+            start_flashing,
+            stop_flashing,
+            switch_slot,
+            update_port,
+            write_from_xml,
+            write_part
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
