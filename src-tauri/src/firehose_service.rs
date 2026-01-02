@@ -26,7 +26,6 @@ pub async fn erase_part(app: &AppHandle, part: &str, xml_content: &str, config: 
             &config.fh_loader_path,
             &config.fh_port_conn_str,
             "--memoryname=ufs",
-            "--convertprogram2read",
             "--showpercentagecomplete",
             "--sendxml=res/cmd.xml",
             "--noprompt",
@@ -47,7 +46,6 @@ pub async fn erase_part(app: &AppHandle, part: &str, xml_content: &str, config: 
             &config.fh_loader_path_linux,
             &config.fh_port_conn_str_linux,
             "--memoryname=ufs",
-            "--convertprogram2read",
             "--showpercentagecomplete",
             "--sendxml=res/cmd.xml",
             "--noprompt",
@@ -433,7 +431,7 @@ pub async fn reboot_to_system(app: &AppHandle, config: &Config) {
     }
 }
 
-pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str, config: &Config) {
+pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str, config: &Config) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         let cmd = [
@@ -445,7 +443,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "-s",
             &loader,
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Loader", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Loader", &app, &config, &cmd).await?;
 
         let cmd = [
             "cmd",
@@ -458,7 +456,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--skip_configure",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Digest", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Digest", &app, &config, &cmd).await?;
 
         let cmd = [
             "cmd",
@@ -470,7 +468,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--skip_configure",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Transfer Config", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Transfer Config", &app, &config, &cmd).await?;
 
         let cmd = [
             "cmd",
@@ -482,7 +480,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--skip_configure",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Verify", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Verify", &app, &config, &cmd).await?;
 
         let cmd = [
             "cmd",
@@ -495,7 +493,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--skip_configure",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Sig", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Sig", &app, &config, &cmd).await?;
 
         let cmd = [
             "cmd",
@@ -507,7 +505,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--skip_configure",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send SHA256 init", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send SHA256 init", &app, &config, &cmd).await?;
 
         let cmd = [
             "cmd",
@@ -520,7 +518,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--noprompt",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Storage Config", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Storage Config", &app, &config, &cmd).await?;
     }
     #[cfg(target_os = "linux")]
     {
@@ -531,7 +529,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "-s",
             &loader,
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Loader", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Loader", &app, &config, &cmd).await?;
 
         let cmd = [
             &*config.sahara_server_path_linux,
@@ -541,7 +539,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--noprompt",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Digest", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Digest", &app, &config, &cmd).await?;
 
         let cmd = [
             &config.sahara_server_path_linux,
@@ -550,7 +548,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--noprompt",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Transfer Config", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Transfer Config", &app, &config, &cmd).await?;
 
         let cmd = [
             &config.sahara_server_path_linux,
@@ -559,7 +557,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--noprompt",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Verify", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Verify", &app, &config, &cmd).await?;
 
         let cmd = [
             &*config.sahara_server_path_linux,
@@ -569,7 +567,7 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--noprompt",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send Sig", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send Sig", &app, &config, &cmd).await?;
 
         let cmd = [
             &config.sahara_server_path_linux,
@@ -580,8 +578,9 @@ pub async fn send_loader(app: &AppHandle, loader: &str, digest: &str, sig: &str,
             "--noprompt",
             "--mainoutputdir=res",
         ];
-        let _ = command_util::exec_cmd_with_msg("Send SHA256 init", &app, &config, &cmd).await;
+        command_util::exec_cmd_with_msg("Send SHA256 init", &app, &config, &cmd).await?;
     }
+    Ok("".to_string())
 }
 
 pub async fn send_nop(app: &AppHandle, config: &Config) {

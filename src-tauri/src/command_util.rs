@@ -17,6 +17,8 @@ pub struct Config {
 
     pub sahara_server_path_linux: String,
 
+    pub port_path: String,
+
     pub fh_port_conn_str: String,
 
     pub sahara_port_conn_str: String,
@@ -45,6 +47,7 @@ impl Config {
             sahara_server_path: String::new(),
             fh_loader_path_linux: String::new(),
             sahara_server_path_linux: String::new(),
+            port_path: String::new(),
             fh_port_conn_str: String::new(),
             sahara_port_conn_str: String::new(),
             fh_port_conn_str_linux: String::new(),
@@ -76,6 +79,7 @@ impl Config {
         };
 
         config.current_dir = parent_dir;
+        config.port_path = port_path.clone();
         config.fh_port_conn_str = port_conn_str;
         config.sahara_port_conn_str = port_str;
         config.fh_port_conn_str_linux = port_conn_str_linux;

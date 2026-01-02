@@ -1,6 +1,6 @@
 [package]
 name = "oplus_edl_toolkit"
-version = "0.9.1"
+version = "0.9.2"
 description = "Oplus EDL Toolkit"
 authors = ["SnowWolf725"]
 edition = "2024"
@@ -43,8 +43,9 @@ tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-os = "2"
 thiserror = "1.0"
 tokio = { version = "1.0", features = ["full"] } 
 x509-parser = "0.15.0"
 xmltree = { version = "0.11.0", features = ["attribute-order"] }
-tauri-plugin-os = "2"
+

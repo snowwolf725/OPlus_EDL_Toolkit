@@ -33,6 +33,7 @@ export default {
 		readGPT: 'Читать GPT',
 		readPart: 'Читать раздел',
 		writePart: 'Записать раздел',
+		erasePart: 'удалить раздел',
 		runCmdFromXML: 'Запустить XML команду',
 		createXML: 'Сохранить в XML',
 		readDeviceInfo: 'Читать Device Info',

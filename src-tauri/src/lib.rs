@@ -139,7 +139,7 @@ async fn identify_loader(app: AppHandle, path: String) {
             let mut count = 0;
             for hash in &results {
                 count += 1;
-                let _ = app.emit("log_event", format!("CA {} SHA384: {}", count, hash));
+                let _ = app.emit("log_event", format!("Key {} SHA384: {}", count, hash));
             }
         }
         Err(_e) => {}
@@ -320,25 +320,18 @@ async fn send_loader(
         return format!("port not available");
     }
     if native {
-        let (port_path, _port_info) = update_port();
-        let mut client = match qdl::SaharaClient::new(Some(port_path)) {
+        let mut client = match qdl::SaharaClient::new(Some(config.port_path.clone())) {
             Ok(client) => client,
             Err(_e) => return format!("Sahara connect error: {}", _e),
         };
-        let _ = app.emit(
-            "log_event",
-            &format!("Chip serial number: {}", client.get_chip_sn()),
-        );
-        let _ = app.emit(
-            "log_event",
-            &format!("OEM Private Key hash: {}", client.get_oem_key_hash()),
-        );
+        let _ = app.emit("log_event", &format!("Chip serial number: {}", client.get_chip_sn()));
+        let _ = app.emit("log_event", &format!("OEM Key hash: {}", client.get_oem_key_hash()));
         client.send_loader(&loader);
     } else {
         let loader_str = r"13:".to_owned() + &loader;
         let digest_str = r"--signeddigests=".to_owned() + &digest;
         let sig_str = r"--signeddigests=".to_owned() + &sig;
-        firehose_service::send_loader(&app, &loader_str, &digest_str, &sig_str, &config).await;
+        let _ = firehose_service::send_loader(&app, &loader_str, &digest_str, &sig_str, &config).await;
         let _ = app.emit("update_loader_status", true);
         let _ = app.emit("update_command_running_status", false);
     }
@@ -392,20 +385,14 @@ fn start_flashing(
                     if super_image_creater::creat_super_image(&package.super_define) == false {
                         let _ = app_clone.emit("stop_edl_flashing", "");
                         let _ = app_clone.emit("log_event", "Failed to create Super image.");
-                        let _ =
-                            app_clone.emit("log_event", "The flashing operation has been stopped");
-                        state_clone
-                            .lock()
-                            .unwrap()
-                            .running
-                            .store(false, Ordering::SeqCst);
+                        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
+                        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     if state_clone.lock().unwrap().running.load(Ordering::SeqCst) == false {
                         let _ = app_clone.emit("log_event", "Operation canceled by user");
-                        let _ =
-                            app_clone.emit("log_event", "The flashing operation has been stopped");
+                        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
@@ -434,13 +421,8 @@ fn start_flashing(
                         &rt,
                     ) == false
                     {
-                        let _ =
-                            app_clone.emit("log_event", "The flashing operation has been stopped");
-                        state_clone
-                            .lock()
-                            .unwrap()
-                            .running
-                            .store(false, Ordering::SeqCst);
+                        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
+                        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
@@ -454,27 +436,16 @@ fn start_flashing(
                         &rt,
                     ) == false
                     {
-                        let _ =
-                            app_clone.emit("log_event", "The flashing operation has been stopped");
-                        state_clone
-                            .lock()
-                            .unwrap()
-                            .running
-                            .store(false, Ordering::SeqCst);
+                        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
+                        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
                     let _ = app_clone.emit("update_percentage", 95);
-                    let result =
-                        rt.block_on(firehose_service::switch_slot(&app_clone, "A", &config));
+                    let result = rt.block_on(firehose_service::switch_slot(&app_clone, "A", &config));
                     if result == false {
-                        let _ =
-                            app_clone.emit("log_event", "The flashing operation has been stopped");
-                        state_clone
-                            .lock()
-                            .unwrap()
-                            .running
-                            .store(false, Ordering::SeqCst);
+                        let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
+                        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
                         let _ = app_clone.emit("update_command_running_status", false);
                         return;
                     }
@@ -489,11 +460,7 @@ fn start_flashing(
             }
         }
 
-        state_clone
-            .lock()
-            .unwrap()
-            .running
-            .store(false, Ordering::SeqCst);
+        state_clone.lock().unwrap().running.store(false, Ordering::SeqCst);
         let _ = app_clone.emit("log_event", "The flashing operation has been stopped");
     });
 
@@ -508,9 +475,7 @@ fn stop_flashing(
     thread_state: State<Arc<Mutex<ThreadState>>>,
 ) -> Result<(), String> {
     // lock thread state
-    let state_guard = thread_state
-        .lock()
-        .map_err(|e| format!("lock thread state faild: {}", e))?;
+    let state_guard = thread_state.lock().map_err(|e| format!("lock thread state faild: {}", e))?;
 
     // if not running then return
     if state_guard.running.load(Ordering::SeqCst) == false {

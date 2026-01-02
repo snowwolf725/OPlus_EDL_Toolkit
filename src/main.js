@@ -36,4 +36,3 @@ const vuetify = createVuetify({
 const app = createApp(App);
 app.use(i18n).use(vuetify);
 app.mount('#app');
-//createApp(App).mount("#app");
