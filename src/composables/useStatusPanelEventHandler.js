@@ -23,6 +23,7 @@ export function useStatusPanelEventHandler(locale, tableColumns, tabList, t) {
         tabList.value = [
             { key: 'tab_part', label: t('part.title') },
             { key: 'tab_edl', label: t('edl.title') },
+            { key: 'tab_adv', label: t('advanced.title') },
             { key: 'tab_setting', label: t('setting.title') },
         ];
     };

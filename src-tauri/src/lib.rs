@@ -88,18 +88,21 @@ fn flash_program_xml(
         count += 1;
         thread::sleep(Duration::from_secs(1));
 
-        let result = runtime.block_on(firehose_service::flash_part(
-            &app, &label, &program, &folder, &config,
+        let result = runtime.block_on(
+            firehose_service::flash_part(&app, &label, &program, &folder, &config,
         ));
-        if result == false {
-            let _ = app.emit("log_event", format!("Failed to flash partition: {}", label));
-            let _ = app.emit("stop_edl_flashing", "");
-            return false;
-        } else {
-            println!("Flash program:{} / {}", (count * 60) / total, total);
-            let _ = app.emit("log_event", format!("Flash partition: {}", label));
-            let _ = app.emit("update_percentage", 20 + (count * 60) / total);
-        }
+        match result {
+            Ok(_output) => {
+                println!("Flash program:{} / {}", (count * 60) / total, total);
+                let _ = app.emit("log_event", format!("Flash partition: {}", label));
+                let _ = app.emit("update_percentage", 20 + (count * 60) / total);
+            },
+            Err(_e) => {
+                let _ = app.emit("log_event", format!("Failed to flash partition: {}", label));
+                let _ = app.emit("stop_edl_flashing", "");
+                return false;
+            },
+        };
     }
     return true;
 }
@@ -187,8 +190,7 @@ async fn read_gpt(app: AppHandle, is_debug: bool) {
 
         let read_xml = xml_file_util::to_xml(&read_tag);
         let xml_content = format!("<?xml version=\"1.0\" ?>\n<data>\n{}\n</data>\n", read_xml);
-        firehose_service::read_part(&app, &format!("LUN {}", i), &xml_content, "img", &config)
-            .await;
+        let _ = firehose_service::read_part(&app, &format!("LUN {}", i), &xml_content, "img", &config).await;
 
         //parser gpt
         let file_path = format!("img/gpt_main{}.bin", i).to_string();
@@ -238,7 +240,7 @@ async fn read_part(app: AppHandle, xml: &str, folder: &str, is_debug: bool) -> R
             ));
         }
 
-        firehose_service::read_part(&app, &part, &xml_content, &folder, &config).await;
+        let _ = firehose_service::read_part(&app, &part, &xml_content, &folder, &config).await;
     }
     let _ = app.emit("update_command_running_status", false);
     Ok(())
@@ -292,6 +294,32 @@ async fn reboot_to_system(app: AppHandle, is_debug: bool) {
     }
     firehose_service::reboot_to_system(&app, &config).await;
     let _ = app.emit("update_loader_status", false);
+}
+
+#[tauri::command]
+async fn run_command(app: AppHandle, cmd_type: String, path: String, content: String, is_debug: bool) -> String {
+    let mut result = String::new();
+    let config = command_util::Config::setup_env(is_debug);
+    if config.is_connect == false {
+        let _ = app.emit("log_event", "port not available");
+        return result;
+    }
+    let _ = app.emit("update_command_running_status", true);
+    let output;
+    if cmd_type == "read" {
+        output = firehose_service::read_part(&app, "", &content, &path, &config).await;
+    } else if cmd_type == "program" {
+        output = firehose_service::flash_part(&app, "", &content, &path, &config).await;
+    } else {
+        output = firehose_service::exec_xml_cmd(&app, &content, &config).await;
+    }
+    
+    let _ = app.emit("update_command_running_status", false);
+    result = match output {
+        Ok(result) => result,
+        Err(_e) => _e,
+    };
+    return result;
 }
 
 #[tauri::command]
@@ -550,7 +578,7 @@ async fn write_from_xml(app: AppHandle, file_path: &str, is_debug: bool) -> Resu
                 "port not available".to_string(),
             ));
         }
-        firehose_service::flash_part(&app, &part, &xml_content, &dir_path, &config).await;
+        let _ = firehose_service::flash_part(&app, &part, &xml_content, &dir_path, &config).await;
     }
     let _ = app.emit("update_command_running_status", false);
     Ok(())
@@ -568,7 +596,7 @@ async fn write_part(app: AppHandle, xml: &str, is_debug: bool) -> Result<(), Err
     let _ = app.emit("update_command_running_status", true);
     let items = xml_file_util::parser_program_xml("", xml);
     for (part, xml_content, dir_path) in items {
-        firehose_service::flash_part(&app, &part, &xml_content, &dir_path, &config).await;
+        let _ = firehose_service::flash_part(&app, &part, &xml_content, &dir_path, &config).await;
     }
     let _ = app.emit("update_command_running_status", false);
     Ok(())
@@ -592,6 +620,7 @@ pub fn run() {
             reboot_to_fastboot,
             reboot_to_recovery,
             reboot_to_system,
+            run_command,
             save_to_xml,
             send_ping,
             send_loader,

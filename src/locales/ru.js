@@ -57,6 +57,13 @@ export default {
 		start: 'Start',
 		stop: 'Stop',
 	},
+	advanced: {
+		title: 'продвинутый',
+		selectCmd: 'Командный шаблон:',
+		xmlContent: 'XML Command:',
+		output: 'Result:',
+		run: 'Выполнить',
+	},
 	log: {
 		title: 'Лог',
 		clearLog: 'Очистить лог',

@@ -130,6 +130,51 @@ html, body {
     align-items: center;
 }
 
+.adv-panel {
+    width: 100%;
+    height: 100%;
+    gap: 20px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+    .adv-panel > :last-child {
+        align-self: center;
+    }
+
+.adv-panel-item-center {
+    align-self: center;
+    height: 10%;
+}
+
+.adv-panel-item {
+    height: 10%;
+    width: 100%;
+    display: flex;
+    margin: 2px 0;
+}
+
+.adv-panel-main {
+    height: 70%;
+    display: flex;
+    flex-direction: row;
+}
+
+.adv-panel-main-left {
+    height: 100%;
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+}
+
+.adv-panel-main-right {
+    height: 100%;
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+}
+
 .setting-panel {
     width: 100%;
     height: 100%;
@@ -435,4 +480,18 @@ th {
     background-color: #2563eb;
     color: white;
     cursor: pointer;
+}
+
+.xml-content {
+    background-color: white;
+    flex: 1;
+}
+
+.result-panel {
+    background-color: rgba(0,0,0,0.5);
+    color: white;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.5;
+    flex: 1;
 }

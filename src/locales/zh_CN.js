@@ -57,6 +57,13 @@
 		start: '开始',
 		stop: '中止',
 	},
+	advanced: {
+		title: '进阶',
+		selectCmd: '命令模板:',
+		xmlContent: 'XML Command:',
+		output: 'Result:',
+		run: '运行',
+	},
 	log: {
 		title: '操作日志',
 		clearLog: '清除操作日志',

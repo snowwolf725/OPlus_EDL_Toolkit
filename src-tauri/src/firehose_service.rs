@@ -62,7 +62,67 @@ pub async fn erase_part(app: &AppHandle, part: &str, xml_content: &str, config: 
     }
 }
 
-pub async fn flash_patch_xml(
+pub async fn exec_xml_cmd (
+    app: &AppHandle,
+    xml_content: &str,
+    config: &Config,
+) -> Result<String, String> {
+    let file_name = "res/cmd.xml";
+    println!("file:{}", &file_name);
+    if let Err(e) = fs::write(&file_name, xml_content) {
+        let _ = app.emit(
+            "log_event",
+            format!("Write file {} failed: {}", file_name, e),
+        );
+        let result = format!("Write file {} failed: {}", file_name, e);
+        return Err(result);
+    } else {
+        println!("success:{}", file_name);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let cmd = [
+            "cmd",
+            "/c",
+            &config.fh_loader_path,
+            &config.fh_port_conn_str,
+            "--memoryname=ufs",
+            "--sendxml=res/cmd.xml",
+            "--noprompt",
+            "--skip_configure",
+            "--mainoutputdir=res",
+        ];
+        return command_util::exec_cmd_with_msg(
+            "execute xml cmd",
+            &app,
+            &config,
+            &cmd,
+        ).await;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let cmd = [
+            &*config.fh_loader_path_linux,
+            &*config.fh_port_conn_str_linux,
+            "--memoryname=ufs",
+            "--showpercentagecomplete",
+            "--sendxml=res/cmd.xml",
+            "--noprompt",
+            "--zlpawarehost=1",
+            "--mainoutputdir=res",
+        ];
+        return command_util::exec_cmd_with_msg(
+            "execute xml cmd",
+            &app,
+            &config,
+            &cmd,
+        ).await;
+    }
+}
+
+
+pub async fn flash_patch_xml (
     app: &AppHandle,
     folder: &str,
     file_name: &str,
@@ -131,17 +191,14 @@ pub async fn flash_part(
     xml_content: &str,
     dir_path: &str,
     config: &Config,
-) -> bool {
+) -> Result<String, String> {
     let dir_str = format!("--search_path={}", &dir_path);
     let file_name = "res/cmd.xml";
     println!("file:{}", &file_name);
     if let Err(e) = fs::write(&file_name, xml_content) {
-        eprintln!("file{}failed:{}", file_name, e);
-        let _ = app.emit(
-            "log_event",
-            &format!("Write file {} failed: {}", file_name, e),
-        );
-        return false;
+        let result = format!("file{}failed:{}", file_name, e);
+        let _ = app.emit("log_event", &result);
+        return Err(result);
     } else {
         println!("success:{}", file_name);
     }
@@ -161,17 +218,12 @@ pub async fn flash_part(
             "--skip_configure",
             "--mainoutputdir=res",
         ];
-        match command_util::exec_cmd_with_msg(
+        return command_util::exec_cmd_with_msg(
             &format!("Writ partition {}", part),
             &app,
             &config,
             &cmd,
-        )
-        .await
-        {
-            Ok(_result) => return true,
-            Err(_e) => return false,
-        };
+        ).await;
     }
     #[cfg(target_os = "linux")]
     {
@@ -186,17 +238,12 @@ pub async fn flash_part(
             "--zlpawarehost=1",
             "--mainoutputdir=res",
         ];
-        match command_util::exec_cmd_with_msg(
+        return command_util::exec_cmd_with_msg(
             &format!("Writ partition {}", part),
             &app,
             &config,
             &cmd,
-        )
-        .await
-        {
-            Ok(_result) => return true,
-            Err(_e) => return false,
-        };
+        ).await;
     }
 }
 
@@ -206,7 +253,7 @@ pub async fn read_part(
     xml_content: &str,
     folder: &str,
     config: &Config,
-) {
+) -> Result<String, String> {
     let file_name = "res/cmd.xml";
     println!("file:{}", &file_name);
     if let Err(e) = fs::write(&file_name, xml_content) {
@@ -214,8 +261,8 @@ pub async fn read_part(
             "log_event",
             format!("Write file {} failed: {}", file_name, e),
         );
-        eprintln!("file{}failed:{}", file_name, e);
-        return;
+        let result = format!("file{}failed:{}", file_name, e);
+        return Err(result);
     } else {
         println!("success:{}", file_name);
     }
@@ -236,13 +283,13 @@ pub async fn read_part(
             "--skip_configure",
             &dir_str,
         ];
-        let _ = command_util::exec_cmd_with_msg(
+        let result = command_util::exec_cmd_with_msg(
             &format!("Read partition {}...", part),
             &app,
             &config,
             &cmd,
-        )
-        .await;
+        ).await;
+        return result;
     }
     #[cfg(target_os = "linux")]
     {
@@ -257,13 +304,13 @@ pub async fn read_part(
             "--zlpawarehost=1",
             &dir_str,
         ];
-        let _ = command_util::exec_cmd_with_msg(
+        let result = command_util::exec_cmd_with_msg(
             &format!("Read partition {}...", part),
             &app,
             &config,
             &cmd,
-        )
-        .await;
+        ).await;
+        return result;
     }
 }
 

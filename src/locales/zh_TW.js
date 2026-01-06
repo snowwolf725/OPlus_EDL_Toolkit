@@ -57,6 +57,13 @@
 		start: '開始',
 		stop: '停止',
 	},
+	advanced: {
+		title: '進階',
+		selectCmd: '指令範本:',
+		xmlContent: 'XML Command:',
+		output: 'Result:',
+		run: '執行',
+	},
 	log: {
 		title: '操作日誌',
 		clearLog: '清除操作日誌',
@@ -67,7 +74,7 @@
 		selectImgPathBtn: '更改',
 		useBuildIn: '使用內建fh_loader',
 		protectLun5: '保護 LUN 5',
-		enablePing: '防止超时重啟',
+		enablePing: '防止超時重啟',
 		storageType: '儲存空間類型：',
 		logLevel: '日誌顯示等級：',
 	}

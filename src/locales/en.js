@@ -61,6 +61,13 @@ export default {
 		title: 'Log',
 		clearLog: 'Clear Log',
 	}, 
+	advanced: {
+		title: 'Advanced',
+		selectCmd: 'Command Template:',
+		xmlContent: 'XML Command:',
+		output: 'Result:',
+		run: 'Run',
+	},
 	setting: {
 		title: 'Setting',
 		imgSavingPath: 'Partition Image Save Path:',

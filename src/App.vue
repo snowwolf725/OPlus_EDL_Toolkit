@@ -3,6 +3,7 @@
     import { useI18n } from 'vue-i18n';
     import { invoke } from "@tauri-apps/api/core";
     import { locale as systemLocale } from "@tauri-apps/plugin-os";
+    import { useAdvancedPanelEventHandler } from './composables/useAdvancedPanelEventHandler.js';
     import { useEdlPanelEventHandler } from './composables/useEdlPanelEventHandler.js';
     import { useEventListener } from './composables/useEventListener.js';
     import { useConfigPanelEventHandler } from './composables/useConfigPanelEventHandler.js';
@@ -19,6 +20,7 @@
     const tabList = ref([
         { key: 'tab_part', label: t('part.title') },
         { key: 'tab_edl', label: t('edl.title') },
+        { key: 'tab_adv', label: t('advanced.title') },
         { key: 'tab_setting', label: t('setting.title') },
     ]);
 
@@ -57,6 +59,15 @@
         changeSavingPath,
         sendPing,
     } = useSettingPanelEventHandler(portName, isSentLoader, isCommandRunning);
+
+    let {
+        xmlContent,
+        cmdOutput,
+        selectedCmd,
+        cmdList,
+        runCommand,
+        handleSelectCmdChange,
+    } = useAdvancedPanelEventHandler(imgSavingPath, isDebug);
 
     let {
         rebootToEdl,
@@ -244,6 +255,33 @@
                                 <button class="edl-btn-green" v-show="isRunning == false" @click="startFlashing">{{ t('edl.start')}}</button>
                                 <button class="edl-btn-red" v-show="isRunning == true" @click="stopFlashing">{{ t('edl.stop')}}</button>
                             </div>
+                        </div>
+                    </div>
+                    <!-- Advanced Panel -->
+                    <div class="adv-panel" v-show="activeTab === 'tab_adv'">
+                        <div class="adv-panel-item">
+                            <label>{{ t('advanced.selectCmd') }}</label>
+                            <select class="header-right" name="template" id="template-select" v-model="selectedCmd" @change="handleSelectCmdChange">
+                                <option v-for="item in cmdList" :key="item.id" :value="item.value">{{ item.label }}</option>
+                            </select>
+                        </div>
+                        <div class="adv-panel-item">
+                            <label class="img-folder-group-title">{{ t('setting.imgSavingPath') }}</label>
+                            <textarea class="img-folder-group-path" v-model="imgSavingPath">img/</textarea>
+                            <button class="img-folder-group-btn" @click="changeSavingPath">{{ t('setting.selectImgPathBtn') }}</button>
+                        </div>
+                        <div class="adv-panel-main">
+                            <div class="adv-panel-main-left">
+                                <label>{{ t('advanced.xmlContent') }}</label>
+                                <textarea class="xml-content" id="xmlContent" v-model="xmlContent" cols="100" rows="5"></textarea>
+                            </div>
+                            <div class="adv-panel-main-right">
+                                <label>{{ t('advanced.output') }}</label>
+                                <textarea class="result-panel" v-model="cmdOutput" cols="100" rows="8" readonly></textarea>
+                            </div>
+                        </div>
+                        <div class="adv-panel-item-center">
+                            <button class="edl-btn-green" @click="runCommand">{{ t('advanced.run')}}</button>
                         </div>
                     </div>
                     <!-- Setting Panel -->

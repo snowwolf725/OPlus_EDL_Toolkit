@@ -1,6 +1,6 @@
 [package]
 name = "oplus_edl_toolkit"
-version = "0.9.3"
+version = "0.9.4"
 description = "Oplus EDL Toolkit"
 authors = ["SnowWolf725"]
 edition = "2024"
