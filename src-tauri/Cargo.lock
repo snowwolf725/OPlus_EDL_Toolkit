@@ -2765,7 +2765,7 @@ dependencies = [
 
 [[package]]
 name = "oplus_edl_toolkit"
-version = "0.9.4"
+version = "0.9.6"
 dependencies = [
  "anstream",
  "anyhow",
