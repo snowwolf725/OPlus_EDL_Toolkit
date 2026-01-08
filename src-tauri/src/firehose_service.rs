@@ -280,6 +280,7 @@ pub async fn read_part(
             "--showpercentagecomplete",
             "--sendxml=res/cmd.xml",
             "--noprompt",
+            "--special_rw_mode=oplus_gptbackup",
             "--skip_configure",
             &dir_str,
         ];
@@ -302,6 +303,7 @@ pub async fn read_part(
             "--sendxml=res/cmd.xml",
             "--noprompt",
             "--zlpawarehost=1",
+            "--special_rw_mode=oplus_gptbackup",
             &dir_str,
         ];
         let result = command_util::exec_cmd_with_msg(

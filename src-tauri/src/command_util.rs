@@ -5,6 +5,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri::Emitter;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
 #[derive(Debug, Clone)]
@@ -191,4 +192,56 @@ async fn exec_cmd(cmd: &[&str], current_dir: Option<&Path>) -> String {
         }
     };
     return result;
+}
+
+async fn exec_cmd_with_progress(app: &AppHandle, cmd: &[&str], current_dir: Option<&Path>) -> Result<String, String> {
+    if cmd.is_empty() {
+        return Err("[Error] cmd is empty".to_string());
+    }
+    let work_dir = match current_dir {
+        Some(current_dir) => current_dir,
+        None => Path::new("."),
+    };
+    let mut exe_cmd = Command::new(cmd[0]);
+    #[cfg(target_os = "windows")]
+    {
+        exe_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW constant
+    }
+    for (_index, s) in cmd.iter().enumerate() {
+        if _index != 0 {
+            exe_cmd.arg(s);
+        }
+    }
+    let mut cmd = exe_cmd.current_dir(&work_dir).stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn().unwrap();
+
+    let stdout = cmd.stdout.take().unwrap();
+    let stderr = cmd.stderr.take().unwrap();
+
+    let stdout_reader = BufReader::new(stdout);
+    let mut stdout_lines = stdout_reader.lines();
+
+    let stderr_reader = BufReader::new(stderr);
+    let mut stderr_lines = stderr_reader.lines();
+
+    let app_clone = app.clone();
+    tokio::spawn(async move {
+        while let Ok(Some(_line)) = stdout_lines.next_line().await {
+           let _ = app_clone.emit("update_working_percentage", "0");
+        }
+    });
+
+    tokio::spawn(async move {
+        while let Ok(Some(_line)) = stderr_lines.next_line().await {
+        }
+    });
+
+    let status = cmd.wait().await.map_err(|e| format!("Command error: {}", e))?;
+
+    if status.success() {
+        Ok("".to_string())
+    } else {
+        Err("Execute command Error".to_string())
+    }
 }

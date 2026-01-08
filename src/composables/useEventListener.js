@@ -11,6 +11,7 @@ export function useEventListener(tableData) {
     let isCommandRunning = false;
     let isSentLoader = ref(false);
     let percentage = ref(0);
+    let working_percentage = ref(0);
 
     watch(isDialogOpen, (newVal) => {
         const dialog = slotDialogRef.value;
@@ -59,6 +60,10 @@ export function useEventListener(tableData) {
         }
     });
 
+    listen("update_working_percentage", (payload) => {
+        working_percentage.value = payload.payload;
+    });
+
     listen("update_partition_table", (payload) => {
         console.log(payload);
         const xml_content = payload.payload.toString();
@@ -97,5 +102,6 @@ export function useEventListener(tableData) {
         isCommandRunning,
         isSentLoader,
         percentage,
+        working_percentage,
     }
 }

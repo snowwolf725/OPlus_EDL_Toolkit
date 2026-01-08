@@ -15,7 +15,7 @@
 
     const { t, locale, availableLocales } = useI18n();
 
-    const activeTab = ref('tab_part');
+    let activeTab = ref('tab_part');
 
     const tabList = ref([
         { key: 'tab_part', label: t('part.title') },
@@ -48,6 +48,7 @@
         isCommandRunning,
         isSentLoader,
         percentage,
+        working_percentage,
     } = useEventListener(tableData);
 
     let {
@@ -349,6 +350,9 @@
                     </div>
                     <div class="log-section" id="logContainer">
                     </div>
+                    <v-progress-linear v-model="working_percentage" height="20" color="amber">
+                        <strong>{{ working_percentage }}%</strong>
+                    </v-progress-linear>
                 </div>
             </div>
         </div>
