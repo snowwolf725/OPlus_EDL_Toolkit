@@ -280,7 +280,7 @@ pub async fn read_part(
             "--showpercentagecomplete",
             "--sendxml=res/cmd.xml",
             "--noprompt",
-            "--special_rw_mode=oplus_gptbackup",
+            "--special_rw_mode=oplus_gptmain",
             "--skip_configure",
             &dir_str,
         ];

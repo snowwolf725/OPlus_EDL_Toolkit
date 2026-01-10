@@ -1,5 +1,6 @@
-import { ref } from "vue";
+﻿import { ref, onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { locale as systemLocale } from "@tauri-apps/plugin-os";
 
 export function useStatusPanelEventHandler(locale, tableColumns, tabList, t) {
 
@@ -7,6 +8,14 @@ export function useStatusPanelEventHandler(locale, tableColumns, tabList, t) {
     let portName = ref("N/A");
     let portNum = ref("");
     let selectedLang = ref('en');
+
+    const displayLang = {
+        "en": "English",
+        "ru": "Russian (русский язык)",
+        "zh-CN": "Simplified  Chinese (简体中文)",
+        "zh-TW": "Traditional Chinese (正體中文)",
+    };
+
 
     const handleSelectLangChange = (e) => {
         locale.value = selectedLang.value;
@@ -40,10 +49,25 @@ export function useStatusPanelEventHandler(locale, tableColumns, tabList, t) {
         }
     }
 
+    onMounted(async () => {
+        let systemlocale = await systemLocale();
+        const match = systemlocale.match(/^[a-zA-Z]+/);
+        const langCode = match ? match[0] : "";
+        if (systemlocale in displayLang) {
+            selectedLang.value = systemlocale;
+        } else if (langCode in displayLang) {
+            selectedLang.value = langCode;
+        } else {
+            selectedLang.value = 'en';
+        }
+        handleSelectLangChange();
+    });
+
     return {
         portStatus,
         portName,
         selectedLang,
+        displayLang,
         handleSelectLangChange,
         updatePort,
     }

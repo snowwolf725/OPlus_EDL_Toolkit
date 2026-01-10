@@ -2,7 +2,7 @@
     import { ref } from "vue";
     import { useI18n } from 'vue-i18n';
     import { invoke } from "@tauri-apps/api/core";
-    import { locale as systemLocale } from "@tauri-apps/plugin-os";
+    
     import { useAdvancedPanelEventHandler } from './composables/useAdvancedPanelEventHandler.js';
     import { useEdlPanelEventHandler } from './composables/useEdlPanelEventHandler.js';
     import { useEventListener } from './composables/useEventListener.js';
@@ -36,6 +36,7 @@
         portStatus,
         portName,
         selectedLang,
+        displayLang,
         handleSelectLangChange,
         updatePort,
     } = useStatusPanelEventHandler(locale, tableColumns, tabList, t);
@@ -104,12 +105,6 @@
     } = useConfigPanelEventHandler(tableData, activeTab, activeStep);
 
     window.onload = async function () {
-        const systemlocale = await systemLocale();
-        if (systemlocale) {
-            selectedLang.value = systemlocale.replace('-', '_');
-            handleSelectLangChange();
-        }
-
         document.getElementById('partFilter').addEventListener('input', valueChangeListener);
     }
     
@@ -140,10 +135,7 @@
                 <span class="status">{{ portName }}</span>
             </div>
             <select class="header-right" name="language" id="language-select" v-model="selectedLang" @change="handleSelectLangChange">
-                <option value="en">English</option>
-                <option value="ru">Russian (русский язык)</option>
-                <option value="zh_CN">Simplified  Chinese (简体中文)</option>
-                <option value="zh_TW">Traditional Chinese (正體中文)</option>
+                <option v-for="locale in $i18n.availableLocales" :key="`locale-${locale}`" :value="locale">{{ displayLang[locale] }}</option>
             </select>
         </div>
         <!-- Main Content -->

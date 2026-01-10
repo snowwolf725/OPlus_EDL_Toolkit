@@ -10,18 +10,18 @@ import * as labsComponents from 'vuetify/labs/components'
 import App from './App.vue'
 import en from "./locales/en.js";
 import ru from "./locales/ru.js";
-import zh_CN from "./locales/zh_CN";
-import zh_TW from "./locales/zh_TW";
+import zh_CN from "./locales/zh-CN";
+import zh_TW from "./locales/zh-TW";
 
 const i18n = createI18n({
     local: 'en',
     fallbackLocale: 'en',
     legacy: false,
     messages: {
-        en: en,
-        ru: ru,
-        zh_CN: zh_CN,
-        zh_TW: zh_TW,
+        'en': en,
+        'ru': ru,
+        'zh-CN': zh_CN,
+        'zh-TW': zh_TW,
     }
 });
 
