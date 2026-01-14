@@ -3,10 +3,15 @@ use serialport::available_ports;
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::AppHandle;
 use tauri::Emitter;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncReadExt, BufReader};
 use tokio::process::Command;
+use tokio::sync::Mutex;
+use bytes::BytesMut;
+use encoding_rs::GBK;
+
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -143,58 +148,32 @@ pub async fn exec_cmd_with_msg(
         }
         let _ = app.emit("log_event", &format!("{}", &cmd_str));
     }
-
-    let result = exec_cmd(&cmd, None).await;
-    if result.contains("[Error]") {
-        let _ = app.emit("log_event", &format!("{}...Error", msg));
-        Err(result)
-    } else {
-        let _ = app.emit("log_event", &format!("{}...OK", msg));
-        Ok(result)
+    let result = exec_cmd_with_progress(&app, &cmd, None).await;
+    match result {
+        Ok(result) => {
+            let _ = app.emit("log_event", &format!("{}...OK", msg));
+            Ok(result)
+        },
+        Err(error) => {
+            let _ = app.emit("log_event", &format!("{}...Error", msg));
+            Err(error)
+        },
     }
 }
 
-async fn exec_cmd(cmd: &[&str], current_dir: Option<&Path>) -> String {
-    if cmd.is_empty() {
-        return "[Error] cmd is empty".to_string();
-    }
-    let work_dir = match current_dir {
-        Some(current_dir) => current_dir,
-        None => Path::new("."),
-    };
-    let mut exe_cmd = Command::new(cmd[0]);
+fn decode_bytes(buffer: &[u8]) -> String {
     #[cfg(target_os = "windows")]
     {
-        exe_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW constant
+        let (decoded, _, _) = GBK.decode(buffer);
+        decoded.to_string()
     }
-    for (_index, s) in cmd.iter().enumerate() {
-        if _index != 0 {
-            exe_cmd.arg(s);
-        }
+    #[cfg(target_os = "linux")]
+    {
+        String::from_utf8_lossy(buffer).to_string()
     }
-    let output = exe_cmd.current_dir(&work_dir).output().await;
-
-    let result = match output {
-        Ok(output) => {
-            if output.status.success() {
-                println!("{}", String::from_utf8_lossy(&output.stdout).to_string());
-                String::from_utf8_lossy(&output.stdout).to_string()
-            } else {
-                let err_msg = String::from_utf8_lossy(&output.stdout).to_string();
-                println!("[Error]: {}", err_msg);
-                format!("[Error]: {}", err_msg)
-            }
-        }
-        Err(e) => {
-            let err_msg = format!("Execution failed: {}", e);
-            println!("[Error]: {}", err_msg);
-            format!("[Error]: {}", err_msg)
-        }
-    };
-    return result;
 }
 
-async fn exec_cmd_with_progress(app: &AppHandle, cmd: &[&str], current_dir: Option<&Path>) -> Result<String, String> {
+pub async fn exec_cmd_with_progress(app: &AppHandle, cmd: &[&str], current_dir: Option<&Path>) -> Result<String, String> {
     if cmd.is_empty() {
         return Err("[Error] cmd is empty".to_string());
     }
@@ -207,41 +186,80 @@ async fn exec_cmd_with_progress(app: &AppHandle, cmd: &[&str], current_dir: Opti
     {
         exe_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW constant
     }
-    for (_index, s) in cmd.iter().enumerate() {
-        if _index != 0 {
-            exe_cmd.arg(s);
-        }
-    }
-    let mut cmd = exe_cmd.current_dir(&work_dir).stdout(std::process::Stdio::piped())
+    exe_cmd.args(&cmd[1..]).current_dir(work_dir);
+    let mut child = exe_cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
-        .spawn().unwrap();
+        .spawn().map_err(|e| format!("Failed to spawn command: {}", e))?;
 
-    let stdout = cmd.stdout.take().unwrap();
-    let stderr = cmd.stderr.take().unwrap();
-
-    let stdout_reader = BufReader::new(stdout);
-    let mut stdout_lines = stdout_reader.lines();
-
-    let stderr_reader = BufReader::new(stderr);
-    let mut stderr_lines = stderr_reader.lines();
-
+    let stdout = child.stdout.take().ok_or("[Error] Failed to capture stdout".to_string())?;
+    let stderr = child.stderr.take().ok_or("[Error] Failed to capture stderr".to_string())?;
+    let stdout_str = Arc::new(Mutex::new(String::new()));
+    let stderr_str = Arc::new(Mutex::new(String::new()));
+    
+    let stdout_clone = Arc::clone(&stdout_str);
     let app_clone = app.clone();
-    tokio::spawn(async move {
-        while let Ok(Some(_line)) = stdout_lines.next_line().await {
-           let _ = app_clone.emit("update_working_percentage", "0");
+    let stdout_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout);
+        let mut buffer = BytesMut::with_capacity(1024);
+        
+        while let Ok(n) = reader.read_buf(&mut buffer).await {
+            if n == 0 {
+                break;
+            }
+
+            let decoded = decode_bytes(&buffer);
+
+            let mut s = stdout_clone.lock().await;
+            *s += &decoded;
+            *s += "\n";
+            
+            let _ = app_clone.emit("update_working_percentage", "0");
+            
+            println!("STDOUT: {}", decoded);
+            
+            buffer.clear();
         }
     });
 
-    tokio::spawn(async move {
-        while let Ok(Some(_line)) = stderr_lines.next_line().await {
+    let stderr_clone = Arc::clone(&stderr_str);
+    let stderr_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr);
+        let mut buffer = BytesMut::with_capacity(1024);
+        
+        while let Ok(n) = reader.read_buf(&mut buffer).await {
+            if n == 0 {
+                break;
+            }
+            
+            let decoded = decode_bytes(&buffer);
+
+            let mut s = stderr_clone.lock().await;
+            *s += &decoded;
+            *s += "\n";
+            
+            println!("STDERR: {}", decoded);
+            buffer.clear();
         }
     });
 
-    let status = cmd.wait().await.map_err(|e| format!("Command error: {}", e))?;
+    let status = child
+        .wait()
+        .await
+        .map_err(|e| format!("Failed to wait for command: {}", e))?;
+
+    let _ = stdout_task.await;
+    let _ = stderr_task.await;
+
+    let final_stdout = stdout_str.lock().await.clone();
+    let final_stderr = stderr_str.lock().await.clone();
 
     if status.success() {
-        Ok("".to_string())
+        Ok(final_stdout)
     } else {
-        Err("Execute command Error".to_string())
+        if final_stderr.is_empty() {
+            Err(final_stdout)
+        } else {
+            Err(final_stderr)
+        }
     }
 }

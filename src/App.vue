@@ -270,7 +270,7 @@
                             </div>
                             <div class="adv-panel-main-right">
                                 <label>{{ t('advanced.output') }}</label>
-                                <textarea class="result-panel" v-model="cmdOutput" cols="100" rows="8" readonly></textarea>
+                                <textarea class="result-panel" id="cmdLogPanel" v-model="cmdOutput" cols="100" rows="8" readonly></textarea>
                             </div>
                         </div>
                         <div class="adv-panel-item-center">

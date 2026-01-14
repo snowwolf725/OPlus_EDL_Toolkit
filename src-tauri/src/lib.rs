@@ -297,7 +297,15 @@ async fn reboot_to_system(app: AppHandle, is_debug: bool) {
 }
 
 #[tauri::command]
-async fn run_command(app: AppHandle, cmd_type: String, path: String, content: String, is_debug: bool) -> String {
+async fn run_command(
+    app: AppHandle, 
+    cmd_type: String, 
+    path: String, 
+    loader: String,
+    digest: String,
+    sig: String,
+    content: String, 
+    is_debug: bool) -> String {
     let mut result = String::new();
     let config = command_util::Config::setup_env(is_debug);
     if config.is_connect == false {
@@ -306,7 +314,87 @@ async fn run_command(app: AppHandle, cmd_type: String, path: String, content: St
     }
     let _ = app.emit("update_command_running_status", true);
     let output;
-    if cmd_type == "read" {
+    if cmd_type == "loader" {
+        let loader_str = r"13:".to_owned() + &loader;
+        
+        #[cfg(target_os = "windows")] {
+            let cmd = [
+            "cmd",
+            "/c",
+            &config.sahara_server_path,
+            "-p",
+            &config.sahara_port_conn_str,
+            "-s",
+            &loader_str,
+            ];
+            output = command_util::exec_cmd_with_msg("Send Loader", &app, &config, &cmd).await;
+        }
+        #[cfg(target_os = "linux")] {
+            let cmd = [
+                &config.sahara_server_path_linux,
+                "-p",
+                &config.sahara_port_conn_str_linux,
+                "-s",
+                &loader_str,
+            ];
+            output = command_util::exec_cmd_with_msg("Send Loader", &app, &config, &cmd).await;
+        }
+    } else if cmd_type == "digest" {
+        let digest_str = r"--signeddigests=".to_owned() + &digest;
+        
+        #[cfg(target_os = "windows")] {
+            let cmd = [
+                "cmd",
+                "/c",
+                &config.fh_loader_path,
+                &config.fh_port_conn_str,
+                &digest_str,
+                "--testvipimpact",
+                "--noprompt",
+                "--skip_configure",
+                "--mainoutputdir=res",
+            ];
+            output = command_util::exec_cmd_with_msg("Send Digest", &app, &config, &cmd).await;
+        }
+        #[cfg(target_os = "linux")] {
+            let cmd = [
+                &*config.sahara_server_path_linux,
+                &*config.fh_port_conn_str_linux,
+                &digest_str,
+                "--testvipimpact",
+                "--noprompt",
+                "--mainoutputdir=res",
+            ];
+            output = command_util::exec_cmd_with_msg("Send Digest", &app, &config, &cmd).await;
+        }
+    } else if cmd_type == "sig" {
+        let sig_str = r"--signeddigests=".to_owned() + &sig;
+        #[cfg(target_os = "windows")] {
+            let cmd = [
+                "cmd",
+                "/c",
+                &config.fh_loader_path,
+                &config.fh_port_conn_str,
+                &sig_str,
+                "--testvipimpact",
+                "--noprompt",
+                "--skip_configure",
+                "--mainoutputdir=res",
+            ];
+            output = command_util::exec_cmd_with_msg("Send Sig", &app, &config, &cmd).await;
+        }
+        #[cfg(target_os = "linux")] {
+            let cmd = [
+                &*config.sahara_server_path_linux,
+                &*config.fh_port_conn_str_linux,
+                &sig_str,
+                "--testvipimpact",
+                "--noprompt",
+                "--mainoutputdir=res",
+            ];
+            output = command_util::exec_cmd_with_msg("Send Sig", &app, &config, &cmd).await;
+        }
+    } else if cmd_type == "read" {
         output = firehose_service::read_part(&app, "", &content, &path, &config).await;
     } else if cmd_type == "program" {
         output = firehose_service::flash_part(&app, "", &content, &path, &config).await;

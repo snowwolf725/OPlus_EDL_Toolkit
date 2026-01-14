@@ -1,6 +1,6 @@
 [package]
 name = "oplus_edl_toolkit"
-version = "0.9.6"
+version = "0.9.7"
 description = "Oplus EDL Toolkit"
 authors = ["SnowWolf725"]
 edition = "2024"
@@ -20,9 +20,12 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 anyhow = "1.0"
 anstream = "0.6.15"
+arc-swap = "1.0"
 bincode = "1.3.3"
 byteorder = "1.4"
+bytes = "1.0"
 encoding = "0.2"
+encoding_rs = "0.8"
 glob = "0.3"
 indexmap = "2.5.0"
 itertools = "0.14.0"

@@ -80,7 +80,7 @@ export function useConfigPanelEventHandler(tableData, activeTab, activeStep) {
                             partSize: item['@_size_in_KB'] + "KB",
                             partStart: item['@_start_sector'],
                             partNum: item['@_num_partition_sectors'],
-                            imgPath: '',
+                            imgPath: item['@_filename'],
                             sel: '',
                             sparse: item['@_sparse'],
                         });
