@@ -23,6 +23,7 @@ pub struct SaharaClient {
 }
 
 impl SaharaClient {
+
     pub fn new(dev_path: Option<String>) -> Result<Self, String> {
         // Set up the device
         let rw_channel = match setup_serial_device(dev_path) {
@@ -57,8 +58,7 @@ impl SaharaClient {
             &mut [],
             vec![],
             true,
-        )
-        .unwrap();
+        ).unwrap();
         println!(
             "OEM Private Key hash: 0x{:02x}",
             key_hash[..key_hash.len() / 3].iter().format("")
@@ -99,13 +99,13 @@ impl SaharaClient {
                 //self.channel.reset_on_drop = true;
 
                 // Get any "welcome" logs
-                let _ = firehose_read(&mut self.channel, firehose_parser_ack_nak);
+                //let _ = firehose_read(&mut self.channel, firehose_parser_ack_nak);
 
                 // Send the host capabilities to the device
-                let _ = firehose_configure(&mut self.channel, true);
+                //let _ = firehose_configure(&mut self.channel, true);
 
                 // Parse some information from the device
-                let _ = firehose_read(&mut self.channel, firehose_parser_configure_response);
+                //let _ = firehose_read(&mut self.channel, firehose_parser_configure_response);
             }
             Err(e) => {
                 eprintln!("Couldn't open the programmer binary: {}", e);

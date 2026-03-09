@@ -62,9 +62,10 @@ impl Config {
             is_connect: false,
             log_level: LogLevel::Info,
         };
-        let (port_path, _port_info) = update_port();
+        let (mut port_path, _port_info) = update_port();
         if port_path == "Not found" {
-            return config;
+            //return config;
+            port_path = "COM5".to_string();
         }
         let port_str = r"\\.\".to_owned() + &port_path;
         let port_conn_str = r"--port=\\.\".to_owned() + &port_path;
@@ -173,6 +174,59 @@ fn decode_bytes(buffer: &[u8]) -> String {
     }
 }
 
+fn parse_transfer(line: &str) -> Result<i32, String> {
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    
+    let seconds_str = parts.iter()
+        .find(|&&part| part == "seconds")
+        .and_then(|&seconds_word| {
+            parts.iter().position(|&p| p == seconds_word).and_then(|pos| {
+                parts.get(pos - 1)
+            })
+        })
+        .ok_or("Can't found number")?;
+    
+    let mbps_str = parts.iter()
+        .find(|&&part| part.ends_with("MBps)"))
+        .and_then(|&mbps_word| {
+            parts.iter().position(|&p| p == mbps_word).and_then(|pos| {
+                parts.get(pos - 1)
+            })
+        })
+        .ok_or("Can't found MBps")?
+        .trim_matches(|c| c == '(' || c == ')');
+    
+    let seconds: f64 = seconds_str.parse()
+        .map_err(|e| format!("Sec Convert failed: {}", e))?;
+    let mbps: f64 = mbps_str.parse()
+        .map_err(|e| format!("MBps Convert failed: {}", e))?;
+    
+    let product = seconds * mbps;
+    let rounded = product.round() as i32;
+    
+    Ok(rounded)
+}
+
+fn parse_kb(line: &str) -> Result<i32, String> {
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    
+    let kb_part = parts.iter()
+        .find(|&&part| part.contains("KB)"))
+        .ok_or("Can't found KB")?;
+    
+    let num_str: String = kb_part.chars()
+        .filter(|c| c.is_numeric() || *c == '.')
+        .collect();
+    
+    let kb_value: f64 = num_str.parse()
+        .map_err(|e| format!("Convert failed: {}", e))?;
+    
+    let mb_value = kb_value / 1024.0;
+    let rounded = mb_value.round() as i32;
+    
+    Ok(rounded)
+}
+
 pub async fn exec_cmd_with_progress(app: &AppHandle, cmd: &[&str], current_dir: Option<&Path>) -> Result<String, String> {
     if cmd.is_empty() {
         return Err("[Error] cmd is empty".to_string());
@@ -201,6 +255,7 @@ pub async fn exec_cmd_with_progress(app: &AppHandle, cmd: &[&str], current_dir: 
     let stdout_task = tokio::spawn(async move {
         let mut reader = BufReader::new(stdout);
         let mut buffer = BytesMut::with_capacity(1024);
+        let mut size_in_mb = 0;
         
         while let Ok(n) = reader.read_buf(&mut buffer).await {
             if n == 0 {
@@ -211,11 +266,27 @@ pub async fn exec_cmd_with_progress(app: &AppHandle, cmd: &[&str], current_dir: 
 
             let mut s = stdout_clone.lock().await;
             *s += &decoded;
-            *s += "\n";
-            
-            let _ = app_clone.emit("update_working_percentage", "0");
-            
-            println!("STDOUT: {}", decoded);
+
+            let lines_collection: Vec<&str> = decoded.lines().collect();
+            for (_i, line) in lines_collection.iter().enumerate() {
+                if size_in_mb == 0 {
+                    size_in_mb = match parse_kb(&line) {
+                        Ok(mb) => mb,
+                        Err(_msg) => 0,
+                    };
+                }
+                if size_in_mb > 0 {
+                    let complet_size_in_mb = match parse_transfer(&line) {
+                        Ok(size) => size,
+                        Err(_msg) => 0,
+                    };
+                    if complet_size_in_mb > 0 && complet_size_in_mb <= size_in_mb {
+                        let percentage = (complet_size_in_mb * 100) / size_in_mb;
+                        let _ = app_clone.emit("update_working_percentage", format!("{}", percentage));
+                    }
+                }
+            }
+            println!("{}", decoded);
             
             buffer.clear();
         }
@@ -252,6 +323,7 @@ pub async fn exec_cmd_with_progress(app: &AppHandle, cmd: &[&str], current_dir: 
 
     let final_stdout = stdout_str.lock().await.clone();
     let final_stderr = stderr_str.lock().await.clone();
+    let _ = app.emit("update_working_percentage", "100");
 
     if status.success() {
         Ok(final_stdout)

@@ -443,6 +443,7 @@ async fn send_loader(
         let _ = app.emit("log_event", &format!("Chip serial number: {}", client.get_chip_sn()));
         let _ = app.emit("log_event", &format!("OEM Key hash: {}", client.get_oem_key_hash()));
         client.send_loader(&loader);
+        let _ = app.emit("log_event", "Send Loader...OK");
     } else {
         let loader_str = r"13:".to_owned() + &loader;
         let digest_str = r"--signeddigests=".to_owned() + &digest;

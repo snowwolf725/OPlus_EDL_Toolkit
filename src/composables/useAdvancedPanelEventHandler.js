@@ -49,7 +49,7 @@ export function useAdvancedPanelEventHandler(imgSavingPath, isDebug) {
         } else if (selectedCmd.value == "program") {
             xmlContent.value = '<?xml version="1.0" ?>\n<data>\n\t<program start_sector="8200" size_in_KB="1024.0" physical_partition_number="0" partofsingleimage="false" file_sector_offset="0" num_partition_sectors="256" readbackverify="false" filename="misc.img" sparse="false" start_byte_hex="0x2008000" SECTOR_SIZE_IN_BYTES="4096" label="misc"/>\n</data>';
         } else if (selectedCmd.value == "erase") {
-            xmlContent.value = '<?xml version="1.0" ?>\n<data>\n\t<erase SECTOR_SIZE_IN_BYTES="4096" physical_partition_number="0" start_sector="8200" num_partition_sectors="256"/>\n</data>';
+            xmlContent.value = '<?xml version="1.0" ?>\n<data>\n\t<erase SECTOR_SIZE_IN_BYTES="4096" physical_partition_number="0" start_sector="8200" label="misc" num_partition_sectors="256"/>\n</data>';
         } else if (selectedCmd.value == "patch") {
             xmlContent.value = '<?xml version="1.0" ?>\n<patches>\n'
                 + '\t<patch start_sector="2" byte_offset="1704" physical_partition_number="0" size_in_bytes="8" value="NUM_DISK_SECTORS-6." filename="DISK" SECTOR_SIZE_IN_BYTES="4096" what="Update last partition 14 \'userdata\' with actual size in Primary Header."/>\n'
